@@ -1,0 +1,16 @@
+{
+  "name": "funservice-fullstack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FunService full-stack home services marketplace with React and Express.",
+  "scripts": {
+    "install:all": "npm install --prefix frontend && npm install --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend"
+  },
+  "dependencies": {
+    "@lottiefiles/dotlottie-react": "^0.19.4",
+    "boneyard-js": "^1.8.1",
+    "resend": "^6.12.4"
+  }
+}
