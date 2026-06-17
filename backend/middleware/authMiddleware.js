@@ -26,6 +26,29 @@ export const protect = asyncHandler(async (req, res, next) => {
   next();
 });
 
+export const optionalProtect = asyncHandler(async (req, res, next) => {
+  const authHeader = req.headers.authorization || "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+
+  if (!token) {
+    next();
+    return;
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = await User.findByPk(decoded.id, {
+      attributes: {
+        exclude: ["password", "otpCode", "otpExpires"]
+      }
+    });
+  } catch {
+    req.user = null;
+  }
+
+  next();
+});
+
 export const isPrivileged = (user) => user?.role === "owner" || user?.role === "admin";
 
 export const owner = (req, res, next) => {

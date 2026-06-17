@@ -65,8 +65,8 @@ export const getServiceCategories = asyncHandler(async (req, res) => {
 });
 
 export const getServices = asyncHandler(async (req, res) => {
-  const { search, category, region, includeDisabled } = req.query;
-  const where = includeDisabled === "true" ? {} : { enabled: true };
+  const { search, category, region } = req.query;
+  const where = {};
 
   if (search) {
     where.title = { [Op.like]: `%${search}%` };

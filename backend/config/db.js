@@ -33,6 +33,15 @@ const connectDB = async () => {
       allowNull: true,
       defaultValue: ""
     });
+    await ensureColumn("bookings", "professionalPhone", {
+      type: DataTypes.STRING,
+      allowNull: true,
+      defaultValue: "99988877766"
+    });
+    await ensureColumn("support_messages", "ticketId", {
+      type: DataTypes.STRING,
+      allowNull: true
+    });
     console.log(`MySQL connected: ${sequelize.config.database}@${sequelize.config.host}`);
   } catch (error) {
     console.error(`MySQL connection error: ${error.message}`);

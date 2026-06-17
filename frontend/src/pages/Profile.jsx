@@ -1,31 +1,137 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   BadgeCheck,
   CalendarDays,
+  History,
   Home,
   LayoutDashboard,
   LocateFixed,
   Mail,
   MapPin,
+  MessageCircle,
   Phone,
   Sparkles,
   UserRound
 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import BookingStatusDrawer from "../components/BookingStatusDrawer.jsx";
+import ProfileHistorySection from "../components/ProfileHistorySection.jsx";
+import { toast } from "../utils/notifications.js";
 import { Skeleton } from "boneyard-js/react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { api } from "../api/client.js";
 import { getCachedUserProfile, getUserProfile, profileDefaults, saveUserProfile } from "../data/profileStore.js";
 import { getCachedUserBookings, getUserBookings } from "../data/bookingStore.js";
-import { onSessionChanged } from "../data/sessionStore.js";
+import { displayUserName, isPrivilegedUser, onSessionChanged } from "../data/sessionStore.js";
+import { isActiveBookingStatus } from "../utils/bookingTracking.js";
 
 const defaultMapCenter = { latitude: 12.9716, longitude: 77.5946 };
 
-const isProfileComplete = (profile) =>
-  Boolean(profile?.name?.trim() && profile?.phone?.trim() && profile?.address?.trim() && profile?.city?.trim());
+const getInitials = (value = "") => {
+  const parts = String(value).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "FS";
+  return parts.length === 1
+    ? parts[0].slice(0, 2).toUpperCase()
+    : `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+};
+
+const getMemberYear = (value) => {
+  const date = value?.toDate?.() || new Date(value || Date.now());
+  return Number.isNaN(date.getTime()) ? new Date().getFullYear() : date.getFullYear();
+};
+
+const formatSupportDate = (value) => {
+  const date = new Date(value || Date.now());
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(safeDate);
+};
+
+const formatTicketStatus = (status = "Pending") => {
+  if (status === "Complete" || status === "Closed") return "Complete";
+  if (status === "Replied") return "Replied";
+  if (status === "Open") return "Pending";
+  return status || "Pending";
+};
+
+const getTicketStatusClass = (status = "Pending") => formatTicketStatus(status).toLowerCase();
+
+const splitSupportMessage = (value = "") => {
+  const message = String(value);
+  const separator = message.indexOf(":");
+
+  if (separator <= 0) {
+    return { type: "Support query", text: message };
+  }
+
+  return {
+    type: message.slice(0, separator).trim() || "Support query",
+    text: message.slice(separator + 1).trim()
+  };
+};
+
+function SupportTicketsSection({ messages, loading }) {
+  return (
+    <section className="profile-history-section profile-support-section">
+      <div className="profile-simple-panel profile-history-card">
+        <div className="profile-history-toolbar">
+          <div>
+            <span className="eyebrow">Support tickets</span>
+            <h2>Your support queries</h2>
+          </div>
+          <Link className="btn btn-primary btn-small" to="/contact">New query <ArrowRight size={14} /></Link>
+        </div>
+
+        {loading ? (
+          <div className="profile-empty">
+            <MessageCircle size={24} />
+            <strong>Loading support tickets...</strong>
+            <p>Your recent queries will appear here.</p>
+          </div>
+        ) : messages.length ? (
+          <div className="support-ticket-list">
+            {messages.map((ticket) => {
+              const { type, text } = splitSupportMessage(ticket.message);
+              return (
+                <article className="support-ticket-card" key={ticket._id || ticket.ticketId}>
+                  <div className="support-ticket-main">
+                    <span className="eyebrow">{ticket.ticketId || ticket._id}</span>
+                    <h3>{type}</h3>
+                    <p>{text || "No message text saved."}</p>
+                    {ticket.reply?.trim() && (
+                      <div className="support-ticket-reply">
+                        <strong>Support reply</strong>
+                        <p>{ticket.reply}</p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="profile-booking-side support-ticket-side">
+                    <span className={`visit-badge ticket-status-${getTicketStatusClass(ticket.status)}`}>
+                      {formatTicketStatus(ticket.status)}
+                    </span>
+                    <small>{formatSupportDate(ticket.createdAt)}</small>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="profile-empty">
+            <MessageCircle size={24} />
+            <strong>No support query yet.</strong>
+            <p>When you contact customer support, your ticket will show here.</p>
+            <Link className="btn btn-primary btn-small" to="/contact">Contact support <ArrowRight size={14} /></Link>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
 
 function LocationMap({ latitude, longitude, interactive = false, onSelect }) {
   const mapNode = useRef(null);
@@ -132,17 +238,25 @@ export function ProfileSkeletonCapture() {
   );
 }
 
-function Profile() {
+function Profile({ dashboardLayout = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selectedTab = searchParams.get("tab");
+  const profileSection = selectedTab === "history" || selectedTab === "support" ? selectedTab : "overview";
+  const trackLive = searchParams.get("track") === "live";
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState(profileDefaults());
   const [loading, setLoading] = useState(true);
+  const [supportLoading, setSupportLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [editing, setEditing] = useState(true);
+  const [editing, setEditing] = useState(false);
   const [bookings, setBookings] = useState([]);
+  const [supportMessages, setSupportMessages] = useState([]);
   const [locating, setLocating] = useState(false);
   const [resolvingCity, setResolvingCity] = useState(false);
+  const [statusBooking, setStatusBooking] = useState(null);
   const formDirty = useRef(false);
   const editRequested = useRef(false);
   const reverseLookupTimer = useRef(null);
@@ -162,22 +276,33 @@ function Profile() {
       setProfile(cachedProfile);
       setForm(cachedProfile || profileDefaults(nextUser));
       formDirty.current = false;
-      setEditing(!isProfileComplete(cachedProfile));
+      editRequested.current = false;
+      setEditing(false);
       setBookings(getCachedUserBookings(nextUser.uid));
+      setSupportMessages([]);
       setLoading(false);
+      setSupportLoading(true);
 
-      const [savedProfile, savedBookings] = await Promise.all([
+      const supportUserId = nextUser.uid || nextUser._id;
+      const [savedProfile, savedBookings, savedSupportMessages] = await Promise.all([
         getUserProfile(nextUser),
-        getUserBookings(nextUser)
+        getUserBookings(nextUser),
+        api.hasToken() && supportUserId
+          ? api.getSupportMessagesByUser(supportUserId).catch((error) => {
+              console.warn("Support tickets unavailable.", error);
+              return [];
+            })
+          : Promise.resolve([])
       ]);
       if (!active) return;
 
       setBookings(savedBookings);
+      setSupportMessages(Array.isArray(savedSupportMessages) ? savedSupportMessages : []);
+      setSupportLoading(false);
       if (savedProfile) {
         setProfile(savedProfile);
         if (!formDirty.current && !editRequested.current) {
           setForm(savedProfile);
-          setEditing(!isProfileComplete(savedProfile));
         }
       }
     };
@@ -191,6 +316,80 @@ function Profile() {
   }, [navigate]);
 
   useEffect(() => () => clearTimeout(reverseLookupTimer.current), []);
+
+  useEffect(() => {
+    const freshBooking = location.state?.freshBooking;
+    if (freshBooking?.bookingId) {
+      setBookings((current) => {
+        if (current.some((item) => item.bookingId === freshBooking.bookingId)) return current;
+        return [freshBooking, ...current];
+      });
+      setStatusBooking(freshBooking);
+      navigate(`${location.pathname}${location.search}`, { replace: true, state: {} });
+      return;
+    }
+
+    const bookingId = searchParams.get("booking");
+    if (!bookingId) return;
+
+    const normalizedId = bookingId.replace(/^#/, "");
+    const match = bookings.find(
+      (booking) =>
+        booking.bookingId === bookingId ||
+        booking.bookingId === `#${normalizedId}` ||
+        booking.bookingId.replace(/^#/, "") === normalizedId
+    );
+    if (match) setStatusBooking(match);
+  }, [bookings, location.pathname, location.search, location.state, navigate, searchParams]);
+
+  const setProfileSection = (tab) => {
+    const next = new URLSearchParams(searchParams);
+    if (tab === "history" || tab === "support") next.set("tab", tab);
+    else next.delete("tab");
+    next.delete("booking");
+    setSearchParams(next, { replace: true });
+    setStatusBooking(null);
+  };
+
+  const openBookingStatus = (booking, { live = false } = {}) => {
+    setStatusBooking(booking);
+    const next = new URLSearchParams(searchParams);
+    if (profileSection === "history") next.set("tab", "history");
+    else next.delete("tab");
+    next.set("booking", String(booking.bookingId).replace(/^#/, ""));
+    if (live || isActiveBookingStatus(booking.bookingStatus)) next.set("track", "live");
+    else next.delete("track");
+    setSearchParams(next, { replace: true });
+  };
+
+  const closeBookingStatus = () => {
+    setStatusBooking(null);
+    const next = new URLSearchParams(searchParams);
+    next.delete("booking");
+    next.delete("track");
+    setSearchParams(next, { replace: true });
+  };
+
+  const cancelBookingStatus = async (booking) => {
+    if (!window.confirm("Are you sure you want to cancel this service request?")) return;
+
+    try {
+      if (api.hasToken()) {
+        await api.cancelBooking(String(booking.bookingId).replace(/^#/, ""));
+      }
+      setBookings((current) =>
+        current.map((item) =>
+          item.bookingId === booking.bookingId ? { ...item, bookingStatus: "Cancelled" } : item
+        )
+      );
+      setStatusBooking((current) =>
+        current?.bookingId === booking.bookingId ? { ...current, bookingStatus: "Cancelled" } : current
+      );
+      toast.success("Booking cancelled successfully.");
+    } catch (error) {
+      toast.error(error.message || "Could not cancel this booking.");
+    }
+  };
 
   const update = (event) => {
     const { name, value } = event.target;
@@ -322,19 +521,27 @@ function Profile() {
     );
   }
 
+  const account = profile || profileDefaults(user);
   const details = [
-    ["Full name", profile?.name, UserRound],
-    ["Email", profile?.email || "Not added", Mail],
-    ["Phone", profile?.phone, Phone]
+    ["Full name", account.name || "Not added", UserRound],
+    ["Email", account.email || "Not added", Mail],
+    ["Phone", account.phone || "Not added", Phone]
   ];
-  const canOpenBackend = user?.role === "admin" || user?.role === "owner";
-  const currentBookings = bookings.filter(
-    (booking) => !["Completed", "Cancelled"].includes(booking.bookingStatus)
-  );
+  const canOpenBackend = isPrivilegedUser(user);
+  const dashboardMode = dashboardLayout || !editing;
+  const sidebarName = displayUserName(profile || user) || profile?.name || form.name || user?.email || "FunService customer";
+  const sidebarYear = getMemberYear(profile?.createdAt || user?.createdAt);
+  const greetingName = displayUserName(profile || user).split(" ")[0];
+  const hasServiceAddress = Boolean(account.address?.trim() && account.city?.trim());
+  const dashboardTitle = `Good morning, ${greetingName}.`;
+  const dashboardCopy = hasServiceAddress
+    ? "Your contact, address, bookings and plan in one simple place."
+    : "Add your contact and service address so bookings are ready to go.";
+  const currentBookings = bookings.filter((booking) => isActiveBookingStatus(booking.bookingStatus));
   const renderBookings = (rows, emptyMessage) => rows.length ? (
     <div className="profile-booking-list">
       {rows.map((booking) => (
-        <article className="profile-booking" key={booking.bookingId}>
+        <button className="profile-booking profile-booking-action" type="button" key={booking.bookingId} onClick={() => openBookingStatus(booking, { live: true })}>
           <div>
             <span className="eyebrow">{booking.bookingId}</span>
             <h3>{booking.serviceName}</h3>
@@ -344,8 +551,9 @@ function Profile() {
             <span className="visit-badge">{booking.bookingStatus}</span>
             <strong>₹{booking.amount}</strong>
             <small>{booking.paymentMethod} | {booking.paymentStatus}</small>
+            <em>Live track</em>
           </div>
-        </article>
+        </button>
       ))}
     </div>
   ) : (
@@ -358,26 +566,44 @@ function Profile() {
   );
 
   return (
-    <main className="profile-page shell">
-      <section className="profile-intro">
-        <span className="eyebrow">{profile ? "My account" : "One last step"}</span>
-        <h1>{profile ? "Your profile." : "Tell us where home is."}</h1>
-        <p>
-          {profile
-            ? "Keep your contact and service details up to date."
-            : "Complete your profile before booking so every visit has the right details."}
-        </p>
-      </section>
+    <main className={`${dashboardMode ? "dashboard-page profile-dashboard-page" : "profile-page"} shell ${!editing ? "profile-dashboard-simple" : ""}`}>
+      {dashboardMode && (
+        <aside className="account-sidebar profile-side-menu">
+          <div className="user-pill"><span>{getInitials(sidebarName)}</span><div><strong>{sidebarName}</strong><small>Member since {sidebarYear}</small></div></div>
+          <button className={profileSection === "overview" ? "active" : ""} type="button" onClick={() => setProfileSection("overview")}><UserRound size={17} /> Profile</button>
+          <button className={profileSection === "history" ? "active" : ""} type="button" onClick={() => setProfileSection("history")}><History size={17} /> History</button>
+          <button className={profileSection === "support" ? "active" : ""} type="button" onClick={() => setProfileSection("support")}><MessageCircle size={17} /> Support</button>
+          {canOpenBackend && <Link to="/owner"><LayoutDashboard size={17} /> Admin Panel</Link>}
+        </aside>
+      )}
 
-      <section className="profile-card">
-        {profile && !editing ? (
+      {!dashboardMode && (!profile || editing) && (
+        <section className="profile-intro">
+          <span className="eyebrow">{profile ? "My account" : "One last step"}</span>
+          <h1>{profile ? "Edit profile." : "Tell us where home is."}</h1>
+          <p>
+            {profile
+              ? "Update only what changed. Keep it simple."
+              : "Complete your profile before booking so every visit has the right details."}
+          </p>
+        </section>
+      )}
+
+      <section className={`profile-card ${dashboardMode ? "dashboard-profile-card" : ""}`}>
+        {!editing ? (
+          profileSection === "history" ? (
+            <ProfileHistorySection bookings={bookings} onSelectBooking={openBookingStatus} />
+          ) : profileSection === "support" ? (
+            <SupportTicketsSection messages={supportMessages} loading={supportLoading} />
+          ) : (
           <>
-            <div className="profile-card-head">
+            <div className="dashboard-head profile-dashboard-head">
               <div>
-                <span className="badge"><BadgeCheck size={15} /> Profile complete</span>
-                <h2>{profile.name}</h2>
+                <span className="eyebrow">My account</span>
+                <h1>{dashboardTitle}</h1>
+                <p>{dashboardCopy}</p>
               </div>
-              <span className="profile-avatar">{profile.name.slice(0, 2).toUpperCase()}</span>
+              <button className="btn btn-primary btn-small" type="button" onClick={beginEditing}>Edit profile <ArrowRight size={14} /></button>
             </div>
             <div className="profile-simple-grid">
               <section className="profile-simple-panel">
@@ -396,19 +622,15 @@ function Profile() {
                 </div>
               </section>
 
-              <article className="profile-address-card">
-                  <div className="profile-map">
-                    <LocationMap latitude={profile.latitude} longitude={profile.longitude} />
-                  </div>
+              <article className="profile-address-card simple-address-card">
                   <div className="profile-address-head">
                     <span><MapPin size={14} /> Default service address</span>
                     <button className="btn btn-ghost btn-small" type="button" onClick={beginEditing}>
                       Edit address
                     </button>
                   </div>
-                  <h3>{profile.address}</h3>
-                  <p>{profile.city}</p>
-                  {profile.latitude && <small>Pin: {profile.latitude}, {profile.longitude}</small>}
+                  <h3>{account.address || "No service address added yet."}</h3>
+                  <p>{account.city || "Add your city to speed up bookings."}</p>
               </article>
 
               <section className="profile-simple-panel">
@@ -421,32 +643,30 @@ function Profile() {
 
               <article className="profile-subscription-card">
                   <Sparkles size={21} />
-                  <span className="eyebrow">{profile.subscriptionStatus === "cancelled" ? "Subscription cancelled" : "Current subscription"}</span>
+                  <span className="eyebrow">{account.subscriptionStatus === "cancelled" ? "Subscription cancelled" : "Current subscription"}</span>
                   <h3>Standard care plan</h3>
-                  <p>{profile.subscriptionStatus === "cancelled" ? "Your plan will end after the current billing period." : "2 of 3 monthly service credits available."}</p>
+                  <p>{account.subscriptionStatus === "cancelled" ? "Your plan will end after the current billing period." : "2 of 3 monthly service credits available."}</p>
                   <div className="progress"><span /></div>
                   <div className="subscription-actions">
                     <Link to="/pricing">Manage subscription <ArrowRight size={14} /></Link>
-                    {profile.subscriptionStatus !== "cancelled" && <button className="btn btn-danger btn-small" type="button" onClick={cancelSubscription} disabled={saving}>Cancel subscription</button>}
+                    {profile && account.subscriptionStatus !== "cancelled" && <button className="btn btn-danger btn-small" type="button" onClick={cancelSubscription} disabled={saving}>Cancel subscription</button>}
                   </div>
               </article>
             </div>
-            <div className="profile-actions">
-              {canOpenBackend && (
-                <Link className="btn btn-primary" to="/backend">
-                  <LayoutDashboard size={16} /> Backend Panel
-                </Link>
-              )}
-              <button className="btn btn-ghost" type="button" onClick={beginEditing}>
-                Edit profile
-              </button>
-              <Link className="btn btn-primary" to="/dashboard">
-                Go to dashboard <ArrowRight size={16} />
-              </Link>
-            </div>
           </>
+          )
         ) : (
           <form className="profile-form" onSubmit={save}>
+            {dashboardMode && (
+              <div className="dashboard-head profile-dashboard-head profile-edit-dashboard-head">
+                <div>
+                  <span className="eyebrow">{profile ? "My account" : "One last step"}</span>
+                  <h1>{profile ? "Edit profile." : "Complete profile."}</h1>
+                  <p>{profile ? "Update only what changed. Keep it simple." : "Add the details needed for fast service bookings."}</p>
+                </div>
+                <Link className="btn btn-ghost btn-small" to="/services">Book service <ArrowRight size={14} /></Link>
+              </div>
+            )}
             <div className="profile-card-head">
               <div>
                 <span className="badge"><Home size={15} /> {profile ? "Edit profile" : "Create profile"}</span>
@@ -496,11 +716,9 @@ function Profile() {
               </label>
             </div>
             <div className="profile-actions">
-              {profile && (
-                <button className="btn btn-ghost" type="button" onClick={() => { setForm(profile); formDirty.current = false; editRequested.current = false; setEditing(false); }}>
-                  Cancel
-                </button>
-              )}
+              <button className="btn btn-ghost" type="button" onClick={() => { setForm(profile || profileDefaults(user)); formDirty.current = false; editRequested.current = false; setEditing(false); }}>
+                Cancel
+              </button>
               <button className="btn btn-primary" disabled={saving}>
                 {saving ? "Saving..." : profile ? "Save changes" : "Create profile"} {!saving && <ArrowRight size={16} />}
               </button>
@@ -508,6 +726,15 @@ function Profile() {
           </form>
         )}
       </section>
+
+      {statusBooking && (
+        <BookingStatusDrawer
+          booking={statusBooking}
+          liveMode={trackLive || isActiveBookingStatus(statusBooking.bookingStatus)}
+          onCancel={cancelBookingStatus}
+          onClose={closeBookingStatus}
+        />
+      )}
     </main>
   );
 }

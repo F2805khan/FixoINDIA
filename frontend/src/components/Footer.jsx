@@ -25,7 +25,7 @@ function Footer() {
           <h4>Quick Links</h4>
           <Link to="/">Home</Link>
           <Link to="/services">Services</Link>
-          <Link to="/history">History</Link>
+          <Link to="/profile?tab=history">History</Link>
           <Link to="/support">Customer Support</Link>
         </div>
 

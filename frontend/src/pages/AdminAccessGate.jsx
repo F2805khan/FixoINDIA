@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { toast } from "react-hot-toast";
+import { toast } from "../utils/notifications.js";
 import { KeyRound, Lock, ShieldCheck } from "lucide-react";
 import { api } from "../api/client.js";
 
@@ -18,7 +18,7 @@ function AdminAccessGate({ onAuthSuccess }) {
     event.preventDefault();
 
     if (!form.identifier.trim() || !form.password) {
-      toast.error("Admin email or ID and password are required.");
+      toast.error("Panel email or ID and password are required.");
       return;
     }
 
@@ -48,15 +48,15 @@ function AdminAccessGate({ onAuthSuccess }) {
       <div className="admin-access-card">
         <div className="admin-access-copy">
           <span className="badge">
-            <ShieldCheck size={15} /> Admin only
+            <ShieldCheck size={15} /> Control access
           </span>
-          <h1>Backend Panel</h1>
-          <p>Sign in with your admin or owner ID to manage services, bookings, payments, and users.</p>
+          <h1>FunService Control</h1>
+          <p>Sign in with your panel or owner ID to manage services, bookings, payments, and users.</p>
         </div>
 
         <form className="auth-form admin-login-form" onSubmit={login}>
           <label>
-            Admin email or ID
+            Panel email or ID
             <span className="input-with-icon">
               <KeyRound size={17} />
               <input
@@ -64,7 +64,7 @@ function AdminAccessGate({ onAuthSuccess }) {
                 name="identifier"
                 value={form.identifier}
                 onChange={update}
-                placeholder="admin@example.com"
+                placeholder="owner@funservice.local"
                 autoComplete="username"
               />
             </span>
@@ -80,14 +80,14 @@ function AdminAccessGate({ onAuthSuccess }) {
                 type="password"
                 value={form.password}
                 onChange={update}
-                placeholder="Admin password"
+                placeholder="Panel password"
                 autoComplete="current-password"
               />
             </span>
           </label>
 
           <button className="btn btn-primary full" type="submit" disabled={loading}>
-            {loading ? "Verifying" : "Open Backend Panel"}
+            {loading ? "Verifying" : "Open Control Panel"}
           </button>
         </form>
       </div>

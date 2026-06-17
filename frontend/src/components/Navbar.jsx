@@ -2,7 +2,6 @@ import { useState } from "react";
 import { NavLink, Link } from "react-router-dom";
 import {
   Bell,
-  CalendarClock,
   Headphones,
   History,
   Home,
@@ -18,22 +17,16 @@ import {
 const baseLinks = [
   { to: "/", label: "Home", icon: Home },
   { to: "/services", label: "Services", icon: Wrench },
-  { to: "/history", label: "History", icon: History },
   { to: "/support", label: "Customer Support", icon: Headphones }
 ];
 
-function Navbar({ user, onLogout, onOpenStatus }) {
+function Navbar({ user, onLogout }) {
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const closeMenus = () => {
     setOpen(false);
     setProfileOpen(false);
-  };
-
-  const openBookingStatus = () => {
-    onOpenStatus?.();
-    closeMenus();
   };
 
   const logout = () => {
@@ -90,13 +83,10 @@ function Navbar({ user, onLogout, onOpenStatus }) {
                 </button>
                 {profileOpen && (
                   <div className="profile-menu" role="menu">
-                    <button type="button" onClick={openBookingStatus} role="menuitem">
-                      <CalendarClock size={16} /> Booking Status
-                    </button>
-                    <Link to="/history" onClick={closeMenus} role="menuitem">
+                    <Link to="/profile?tab=history" onClick={closeMenus} role="menuitem">
                       <History size={16} /> History
                     </Link>
-                    {user.role === "admin" && (
+                    {(user.role === "admin" || user.role === "owner") && (
                       <Link to="/backend" onClick={closeMenus} role="menuitem">
                         <ShieldCheck size={16} /> Backend
                       </Link>

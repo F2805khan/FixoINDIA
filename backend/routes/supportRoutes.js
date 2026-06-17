@@ -3,11 +3,11 @@ import {
   createSupportMessage,
   getSupportMessagesByUser
 } from "../controllers/supportController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { optionalProtect, protect } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.post("/message", createSupportMessage);
+router.post("/message", optionalProtect, createSupportMessage);
 router.get("/messages/:userId", protect, getSupportMessagesByUser);
 
 export default router;

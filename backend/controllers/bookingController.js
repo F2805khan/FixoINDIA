@@ -6,6 +6,8 @@ import Service from "../models/Service.js";
 import generateBookingId from "../utils/generateBookingId.js";
 import { notifyWhatsAppAgent } from "../utils/whatsappAgent.js";
 import { assertPaymentMethodEnabled } from "../utils/paymentMethods.js";
+import { updateAcceptedBookingsCSV } from "../utils/excelExporter.js";
+
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -154,6 +156,7 @@ export const updateBookingStatus = asyncHandler(async (req, res) => {
 
   booking.bookingStatus = nextStatus;
   await booking.save();
+  await updateAcceptedBookingsCSV().catch(err => console.error("CSV update failed", err));
 
   res.json(booking);
 });
@@ -170,6 +173,7 @@ export const cancelBooking = asyncHandler(async (req, res) => {
 
   booking.bookingStatus = "Cancelled";
   await booking.save();
+  await updateAcceptedBookingsCSV().catch(err => console.error("CSV update failed", err));
   res.json({ message: "Booking cancelled successfully", booking });
 });
 
@@ -183,6 +187,7 @@ export const deleteBooking = asyncHandler(async (req, res) => {
 
   assertBookingAccess(req, booking);
   await booking.destroy();
+  await updateAcceptedBookingsCSV().catch(err => console.error("CSV update failed", err));
 
   res.json({ message: "Booking deleted successfully" });
 });
@@ -196,10 +201,12 @@ export const assignProfessional = asyncHandler(async (req, res) => {
   }
 
   booking.professionalName = req.body.professionalName || booking.professionalName;
+  booking.professionalPhone = req.body.professionalPhone || booking.professionalPhone || "99988877766";
   booking.professionalPhoto = req.body.professionalPhoto || booking.professionalPhoto;
   booking.estimatedArrival = req.body.estimatedArrival || booking.estimatedArrival;
   booking.bookingStatus = "Professional Assigned";
   await booking.save();
+  await updateAcceptedBookingsCSV().catch(err => console.error("CSV update failed", err));
 
   let whatsappAgent;
   try {

@@ -1,22 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
-import { Toaster, toast } from "react-hot-toast";
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+import { toast } from "./utils/notifications.js";
+import NotificationCenter from "./components/NotificationCenter.jsx";
 import OwnerPanel from "./pages/OwnerPanel.jsx";
 import LoginSignup from "./pages/LoginSignup.jsx";
 import Profile, { ProfileSkeletonCapture } from "./pages/Profile.jsx";
+import Services from "./pages/Services.jsx";
+import BookingStatus from "./pages/BookingStatus.jsx";
 import {
   ArrowRight, BadgeCheck, Banknote, Bell, CalendarDays, Check, CheckCircle2, ChevronDown,
   ChevronRight, Clock3, CreditCard, Droplets, Flower2, Gauge, Home, Instagram,
-  Landmark, LayoutDashboard, LockKeyhole, LogOut, Mail, Menu, MessageCircle, Paintbrush, Phone, Refrigerator,
-  PlayCircle, ScanLine, Scissors, Search, ShieldCheck, Sparkles, Star, UserRound, UsersRound,
+  Landmark, LayoutDashboard, LockKeyhole, LogOut, Mail, MapPin, Menu, MessageCircle, Paintbrush, Phone, Refrigerator,
+  PlayCircle, ScanLine, Scissors, ShieldCheck, ShoppingCart, Sparkles, Star, UserRound, UsersRound,
   WalletCards, WandSparkles, WashingMachine, Wind, Wrench, X, Zap
 } from "lucide-react";
 import { api } from "./api/client.js";
 import { getUserProfile } from "./data/profileStore.js";
 import { saveUserBooking } from "./data/bookingStore.js";
 import { getBestCustomerReviews, getCustomerReviews, saveCustomerReview } from "./data/reviewStore.js";
-import { logoutSession, onSessionChanged } from "./data/sessionStore.js";
+import { displayUserName, isPrivilegedUser, logoutSession, onSessionChanged } from "./data/sessionStore.js";
+
+const isPhoneLike = (value) => /^[+\d][\d\s-]{7,}$/.test(String(value || "").trim());
 
 const fallbackServices = [
   { id: "house-maid", title: "House Maid", category: "Cleaning", description: "Reliable daily help for a calm, cared-for home.", price: 399, duration: "2-3 hrs", icon: Sparkles, image: "/images/site/home-care.jpg" },
@@ -28,6 +32,53 @@ const fallbackServices = [
   { id: "appliance-repair", title: "Appliance Repair", category: "Repairs", description: "Diagnostics and dependable repair for home essentials.", price: 399, duration: "60 mins", icon: WashingMachine, image: "/images/site/appliance-repair.jpg" },
   { id: "home-deep-clean", title: "Home Deep Clean", category: "Cleaning", description: "A room-by-room clean for a fresh start at home.", price: 2199, duration: "4-5 hrs", icon: Droplets, image: "/images/site/deep-clean.jpg" }
 ];
+
+const beautyCategoryNames = new Set(["Salon at Home", "Spa at Home", "Beauty at home", "Beauty"]);
+const beautySearchTerms = ["beauty", "salon", "spa", "facial", "waxing", "threading", "mehndi", "nail", "makeup", "grooming", "haircut", "beard"];
+
+const isBeautyService = (service = {}) => {
+  const category = String(service.category || "");
+  const title = String(service.title || "");
+  const haystack = `${category} ${title} ${service.description || ""}`.toLowerCase();
+  return beautyCategoryNames.has(category) || beautySearchTerms.some((term) => haystack.includes(term));
+};
+
+const getGeneralCatalogServices = (services = []) => services.filter((service) => !isBeautyService(service));
+
+const interleaveServices = (...groups) => {
+  const longest = Math.max(0, ...groups.map((group) => group.length));
+  return Array.from({ length: longest }).flatMap((_, index) => groups.map((group) => group[index]).filter(Boolean));
+};
+
+const cartStorageKey = "funservice-cart-items";
+
+const getServiceCartId = (service) => String(service?.bookingId || service?.id || service?._id || service?.serviceId || service?.title || "");
+
+const normalizeCartItem = (service, quantity = 1) => ({
+  id: getServiceCartId(service),
+  title: service.title,
+  category: service.category || service.salonName || "Service",
+  description: service.description || "",
+  image: service.image || "/images/site/home-care.jpg",
+  duration: service.duration || "Slot based",
+  price: Number(service.price) || 0,
+  salonName: service.salonName || "",
+  quantity
+});
+
+const readCartItems = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(cartStorageKey) || "[]");
+    return Array.isArray(saved) ? saved.filter((item) => item?.id && item?.title) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveCartItems = (items) => {
+  localStorage.setItem(cartStorageKey, JSON.stringify(items));
+  return items;
+};
 
 const serviceIconByCategory = {
   Cleaning: Sparkles,
@@ -90,27 +141,15 @@ function useCatalogServices() {
   return catalogServices;
 }
 
-const paymentConfirmationAnimation = "/animations/payment-confirmation.json";
-const cashBookingConfirmationAnimation = "/animations/cash-booking-confirmed.json";
-
-function BookingConfirmationAnimation({ compact = false, paymentStatus }) {
-  const isPaid = paymentStatus === "Paid";
-  return (
-    <div className={compact ? "payment-lottie compact" : "payment-lottie"} aria-hidden="true">
-      <DotLottieReact src={isPaid ? paymentConfirmationAnimation : cashBookingConfirmationAnimation} loop autoplay />
-    </div>
-  );
-}
-
 const beautyServices = [
-  ["Women's Salon", "Hair, styling and spa rituals", Scissors, "/images/site/beauty-salon.jpg"],
-  ["Facial & Cleanup", "Glow-led skin care at home", Sparkles, "/images/site/beauty-facial.jpg"],
-  ["Waxing", "Comfortable, hygienic essentials", WandSparkles, "/images/site/beauty-facial.jpg"],
-  ["Threading", "Precise finishing touches", ScanLine, "/images/site/beauty-threading.jpg"],
-  ["Mehndi", "Intricate designs for every celebration", Flower2, "/images/site/beauty-mehndi.jpg"],
-  ["Nail Art", "Polished details, made personal", Sparkles, "/images/site/beauty-nails.jpg"],
-  ["Men's Grooming", "Sharp, effortless home grooming", Scissors, "/images/site/beauty-grooming.jpg"],
-  ["Men's Facial", "Skin reset and refresh", Sparkles, "/images/site/beauty-mens-facial.jpg"]
+  { id: "beauty-glow-studio-hair-styling", title: "Women's Salon", category: "Beauty at home", description: "Hair styling and soft salon rituals delivered at home.", price: 699, duration: "60 mins", icon: Scissors, image: "/images/site/beauty-salon.jpg" },
+  { id: "beauty-glow-studio-signature-facial", title: "Facial & Cleanup", category: "Beauty at home", description: "Glow-led skin care with cleanup and massage.", price: 899, duration: "75 mins", icon: Sparkles, image: "/images/site/beauty-facial.jpg" },
+  { id: "beauty-waxing", bookingId: "beauty-glow-studio-threading-waxing", title: "Waxing", category: "Beauty at home", description: "Comfortable, hygienic essentials with single-use care.", price: 549, duration: "50 mins", icon: WandSparkles, image: "/images/site/beauty-facial.jpg" },
+  { id: "beauty-threading", bookingId: "beauty-glow-studio-threading-waxing", title: "Threading", category: "Beauty at home", description: "Precise finishing touches for brows and face.", price: 549, duration: "50 mins", icon: ScanLine, image: "/images/site/beauty-threading.jpg" },
+  { id: "beauty-blush-and-bloom-mehndi-session", title: "Mehndi", category: "Beauty at home", description: "Intricate celebration-ready designs at your doorstep.", price: 999, duration: "90 mins", icon: Flower2, image: "/images/site/beauty-mehndi.jpg" },
+  { id: "beauty-blush-and-bloom-nail-ritual", title: "Nail Art", category: "Beauty at home", description: "Shape, polish and detail-led nail art finishing.", price: 749, duration: "70 mins", icon: Sparkles, image: "/images/site/beauty-nails.jpg" },
+  { id: "beauty-the-groom-room-mens-grooming", title: "Men's Grooming", category: "Beauty at home", description: "Haircut, beard trim and home grooming in one visit.", price: 599, duration: "60 mins", icon: Scissors, image: "/images/site/beauty-grooming.jpg" },
+  { id: "beauty-the-groom-room-mens-facial", title: "Men's Facial", category: "Beauty at home", description: "A clean, restorative facial for a fresh everyday reset.", price: 799, duration: "70 mins", icon: Sparkles, image: "/images/site/beauty-mens-facial.jpg" }
 ];
 
 const beautySalons = [
@@ -166,7 +205,7 @@ const beautyAppointments = beautySalons.flatMap((salon) =>
 );
 
 const plans = [
-  { name: "Essentials", price: "499", note: "For the quick fixes", features: ["1 service credit", "Verified professional", "Standard support"] },
+  { name: "Essentials", price: "499", note: "For small home fixes", features: ["1 service credit", "Verified professional", "Standard support"] },
   { name: "Standard", price: "999", note: "For a smoother month", popular: true, features: ["3 service credits", "Priority slots", "15% off add-ons", "WhatsApp support"] },
   { name: "Premium", price: "1,899", note: "For hands-free homes", features: ["6 service credits", "Same-day priority", "20% off add-ons", "Dedicated care"] }
 ];
@@ -185,41 +224,149 @@ const checklistGroups = [
 ];
 
 function Logo() {
-  return <Link className="brand" to="/"><span className="brand-mark"><Home size={17} /></span><span>FunService<span className="brand-dot">.</span></span></Link>;
+  return <Link className="brand" to="/"><span className="brand-mark">FS</span><span>FunService</span></Link>;
 }
 
-function Navbar() {
+function Navbar({ cartCount = 0 }) {
   const [open, setOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const [loggingOut, setLoggingOut] = useState(false);
   const location = useLocation();
-  const canOpenBackend = user?.role === "admin" || user?.role === "owner";
-  const links = [["/", "Home"], ["/services", "Services"], ["/beauty", "Beauty"], ["/pricing", "Pricing"], ["/vision", "AI Vision"], ["/contact", "Support"]];
+  const navigate = useNavigate();
+  
+  const links = [
+    { to: "/", label: "Home" },
+    { to: "/services", label: "Services" },
+    { to: "/vision", label: "AI Vision", className: "vision-link" },
+    { to: "/contact", label: "Customer Support" }
+  ];
 
   useEffect(() => onSessionChanged(setUser), []);
 
-  return <header className="site-nav">
-    <div className="nav-inner shell">
-      <Logo />
-      <button className="mobile-toggle" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>{open ? <X size={21} /> : <Menu size={21} />}</button>
-      <nav className={`nav-links ${open ? "is-open" : ""}`}>{links.map(([to, label]) => <NavLink key={to} to={to} onClick={() => setOpen(false)} className={to === "/beauty" ? "beauty-link" : ""}>{label}</NavLink>)}{canOpenBackend && <Link className="mobile-account-link" to="/backend" onClick={() => setOpen(false)}><LayoutDashboard size={15} /> Backend Panel</Link>}<Link className="mobile-account-link" to={user ? "/profile" : "/auth"} onClick={() => setOpen(false)}><UserRound size={15} /> {user ? "Profile" : "Login / Signup"}</Link></nav>
-      <div className="nav-actions">{canOpenBackend && <Link className="btn btn-ghost btn-small" to="/backend">Backend Panel</Link>}<Link className="btn btn-ghost btn-small" to={user ? "/profile" : "/auth"}>{user ? "Profile" : "Login"}</Link><Link className="btn btn-primary btn-small" to="/book/house-maid">Book Now <ArrowRight size={15} /></Link></div>
-    </div>
-    {location.pathname === "/beauty" && <div className="beauty-nav-line" />}
-  </header>;
+  const logout = async () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    try {
+      await logoutSession();
+      setOpen(false);
+      toast.success("Logged out successfully.");
+      navigate("/auth", { replace: true });
+    } catch {
+      toast.error("Could not log out.");
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  return (
+    <header className="site-nav">
+      <div className="nav-inner shell">
+        <Logo />
+        <button className="mobile-toggle" aria-label="Toggle navigation" onClick={() => setOpen(!open)}>
+          {open ? <X size={21} /> : <Menu size={21} />}
+        </button>
+        <nav className={`nav-links ${open ? "is-open" : ""}`}>
+          {links.map(({ to, label, className }) => (
+            <NavLink key={to} to={to} className={className} onClick={() => setOpen(false)}>
+              {label}
+            </NavLink>
+          ))}
+          <Link className="mobile-account-link" to={user ? "/profile" : "/auth"} onClick={() => setOpen(false)}>
+            <UserRound size={15} /> {user ? "Profile" : "Login / Signup"}
+          </Link>
+          {user && (
+            <Link className="mobile-account-link" to="/profile?tab=history" onClick={() => setOpen(false)}>
+              <CalendarDays size={15} /> Booking history
+            </Link>
+          )}
+          {user && isPrivilegedUser(user) && (
+            <Link className="mobile-account-link" to="/owner" onClick={() => setOpen(false)}>
+              <LayoutDashboard size={15} /> Admin Panel
+            </Link>
+          )}
+          {user && (
+            <button className="mobile-account-link mobile-logout-link" type="button" onClick={logout} disabled={loggingOut}>
+              <LogOut size={15} /> {loggingOut ? "Logging out..." : "Logout"}
+            </button>
+          )}
+        </nav>
+        <div className="nav-actions">
+          <NotificationCenter />
+          {user ? (
+            <>
+              <Link className="btn btn-primary compact" to="/profile" style={{ background: "var(--accent)", borderRadius: "20px", minHeight: "36px", fontSize: "12px" }}>
+                {displayUserName(user)}
+              </Link>
+              {isPrivilegedUser(user) && (
+                <Link className="btn btn-ghost compact admin-panel-btn" to="/owner" style={{ borderRadius: "20px", minHeight: "36px", fontSize: "12px" }}>
+                  <LayoutDashboard size={14} /> Admin Panel
+                </Link>
+              )}
+            </>
+          ) : (
+            <Link className="btn btn-primary compact" to="/auth" style={{ background: "var(--accent)", borderRadius: "20px", minHeight: "36px", fontSize: "12px" }}>
+              Login / Signup
+            </Link>
+          )}
+
+          {user && (
+            <button className="icon-button danger" type="button" aria-label={loggingOut ? "Logging out" : "Logout"} title="Logout" onClick={logout} disabled={loggingOut}>
+              <LogOut size={18} />
+            </button>
+          )}
+
+          <Link className="icon-button cart-icon-button" aria-label={`Cart ${cartCount ? `(${cartCount})` : ""}`} to="/cart">
+            <ShoppingCart size={18} />
+            {cartCount > 0 && <span className="cart-count">{cartCount}</span>}
+          </Link>
+        </div>
+      </div>
+      {location.pathname === "/beauty" && <div className="beauty-nav-line" />}
+      {location.pathname === "/vision" && <div className="vision-nav-line" />}
+    </header>
+  );
 }
 
 function SectionHead({ label, title, copy, link, linkLabel = "Explore all" }) {
   return <div className="section-head"><div>{label && <span className="eyebrow">{label}</span>}<h2>{title}</h2>{copy && <p>{copy}</p>}</div>{link && <Link className="text-link" to={link}>{linkLabel} <ArrowRight size={16} /></Link>}</div>;
 }
 
-function ServiceCard({ service, compact = false, index = 0 }) {
+function ServiceCard({ service, compact = false, index = 0, onBookService }) {
   const Icon = service.icon;
-  return <article className={`service-card ${compact ? "compact" : ""}`}>
-    <div className="service-photo"><img src={service.image} alt="" /></div>
+  const bookingId = service.bookingId || service.id;
+  const isDisabled = service.enabled === false;
+  return <article className={`service-card ${compact ? "compact" : ""} ${isDisabled ? "disabled" : ""}`} style={isDisabled ? { opacity: 0.8 } : {}}>
+    <div className="service-photo" style={{ position: "relative" }}>
+      <img src={service.image} alt="" />
+      {isDisabled && (
+        <span className="coming-soon-badge" style={{
+          position: "absolute",
+          top: "10px",
+          right: "10px",
+          background: "var(--accent-ink, #34440b)",
+          color: "var(--accent, #92b81e)",
+          border: "1px solid var(--accent-border)",
+          padding: "3px 6px",
+          borderRadius: "20px",
+          fontSize: "8px",
+          fontWeight: "900",
+          textTransform: "uppercase",
+          letterSpacing: "0.5px"
+        }}>
+          Coming Soon
+        </span>
+      )}
+    </div>
     <div className="service-card-top"><span className="service-icon"><Icon size={24} /></span><span className="service-number">{String(index + 1).padStart(2, "0")}</span></div>
     <h3>{service.title}</h3><p>{service.description}</p>
     {!compact && <div className="service-meta"><span>From <b>₹{service.price}</b></span><span><Clock3 size={14} /> {service.duration}</span></div>}
-    <Link className="card-link" to={`/book/${service.id}`}>Book service <ArrowRight size={15} /></Link>
+    {isDisabled ? (
+      <span className="card-link-disabled" style={{ display: "inline-flex", gap: "5px", alignItems: "center", color: "var(--muted)", fontSize: "11px", fontWeight: "800", cursor: "not-allowed", padding: "12px 0 0" }}>
+        Coming Soon
+      </span>
+    ) : (
+      <Link className="card-link" to={`/book/${bookingId}`} onClick={() => onBookService?.(service)}>Book service <ArrowRight size={15} /></Link>
+    )}
   </article>;
 }
 
@@ -233,9 +380,33 @@ function PricingCards({ condensed = false }) {
   </article>)}</div>;
 }
 
-function HomePage() {
+function HomePage({ onBookService }) {
   const trustItems = ["Verified Pros", "Background Checked", "Insured Visits", "Same-Day Booking", "Transparent Pricing"];
   const services = useCatalogServices();
+  const generalServices = useMemo(() => getGeneralCatalogServices(services), [services]);
+  const mixedLandingServices = useMemo(
+    () => interleaveServices(generalServices.slice(0, 4), beautyServices.slice(0, 4)).slice(0, 8),
+    [generalServices]
+  );
+  const highlightedPages = useMemo(() => [
+    {
+      to: "/services",
+      label: "Home services",
+      title: "Cleaning, repairs and maintenance",
+      copy: "Everyday care for the jobs that keep your home running.",
+      image: generalServices[0]?.image || "/images/site/home-care.jpg",
+      Icon: Home
+    },
+    {
+      to: "/beauty",
+      label: "Beauty services",
+      title: "Salon and grooming at home",
+      copy: "Facials, grooming, nail art, mehndi and styling in one beauty page.",
+      image: "/images/site/beauty-salon.jpg",
+      Icon: Sparkles,
+      beauty: true
+    }
+  ], [generalServices]);
   const [customerReviews, setCustomerReviews] = useState([]);
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewForm, setReviewForm] = useState({ name: "", email: "", city: "", service: "Home cleaning", rating: 5, text: "" });
@@ -279,7 +450,7 @@ function HomePage() {
         <span className="eyebrow hero-eyebrow"><span className="live-dot" /> Trusted home care, one tap away</span>
         <h1><span className="hero-line">Your Home,</span><span className="hero-line hero-line-accent">Handled.</span></h1>
         <p>Trusted professionals for cleaning, maintenance and beauty, thoughtfully delivered to your doorstep.</p>
-        <div className="hero-actions"><Link className="btn btn-primary" to="/services">Book a Service <ArrowRight size={17} /></Link><Link className="btn btn-ghost" to="/services">See All Services</Link></div>
+        <div className="hero-actions"><Link className="btn btn-primary" to="/services">Book a Service <ArrowRight size={17} /></Link><Link className="btn btn-ghost" to="/beauty">Explore Beauty</Link></div>
         <div className="stat-row"><span><Star size={15} fill="currentColor" /> 4.9 Rated</span><span><UsersRound size={15} /> 10,000+ Bookings</span><span><Clock3 size={15} /> Same-Day Slots</span></div>
       </div>
       <div className="hero-art">
@@ -307,7 +478,20 @@ function HomePage() {
         <div className="art-pill"><CheckCircle2 size={14} /> Secure booking</div>
       </div>
     </section>
-    <section className="services-section shell section"><SectionHead label="What we do" title="Every Service Your Home Needs" copy="Thoughtful care, qualified hands, no guesswork." link="/services" /><div className="services-grid">{services.slice(0, 8).map((service, index) => <ServiceCard key={service.id} service={service} compact index={index} />)}</div></section>
+    <section className="landing-page-highlights shell">
+      {highlightedPages.map(({ to, label, title, copy, image, Icon, beauty }) => (
+        <Link className={`page-highlight-card ${beauty ? "beauty" : ""}`} to={to} key={to}>
+          <img src={image} alt="" />
+          <div>
+            <span><Icon size={15} /> {label}</span>
+            <h2>{title}</h2>
+            <p>{copy}</p>
+            <strong>Open page <ArrowRight size={15} /></strong>
+          </div>
+        </Link>
+      ))}
+    </section>
+    <section className="services-section landing-mix-section shell section"><SectionHead label="Featured mix" title="Home Care And Beauty, Together" copy="Popular picks for tidy rooms, smooth repairs and at-home glow." link="/services" linkLabel="View home services" /><div className="services-grid">{mixedLandingServices.map((service, index) => <ServiceCard key={service.id} service={service} compact index={index} onBookService={onBookService} />)}</div></section>
     <section className="process-section section"><div className="shell"><SectionHead label="How it works" title="Three Steps. Zero Stress." copy="A smoother home starts with a few simple taps." /><div className="process-grid">{[["01", "Choose", "Pick a service and a slot that fits your day."], ["02", "Confirm", "Review your details and pay securely online."], ["03", "Relax", "A verified professional arrives right on time."]].map(([number, title, copy]) => <article className="process-step" key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p></article>)}</div></div></section>
     <section className="trust-section"><div className="marquee">{[...trustItems, ...trustItems].map((item, index) => <span key={`${item}-${index}`}><BadgeCheck size={17} /> {item}</span>)}</div><div className="shell testimonial-wrap"><SectionHead label="Loved at home" title="The Kind Of Service People Talk About." copy="The three highest-rated customer reviews are promoted here automatically." /><div className="testimonials">{featuredTestimonials.map(({ reviewId, name, city, service, text, rating, image }) => <article className="testimonial" key={reviewId}><div className="stars">{Array.from({ length: rating }).map((_, index) => <Star key={index} size={14} fill="currentColor" />)}</div><p>"{text}"</p><div className="testimonial-person">{image ? <img src={image} alt="" /> : <span className="review-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>}<div><strong>{name}</strong><span>{city} · {service}</span></div></div></article>)}</div><section className="review-submit-panel"><div><span className="eyebrow">Share your experience</span><h3>Had a visit worth talking about?</h3><p>Submit a rating and note. The best customer reviews automatically move into the testimonial cards above.</p></div><form onSubmit={submitReview}><div className="review-form-grid"><label><span>Your name</span><input required name="name" value={reviewForm.name} onChange={updateReview} placeholder="Your name" /></label><label><span>Email</span><input required name="email" type="email" value={reviewForm.email} onChange={updateReview} placeholder="you@example.com" /></label><label><span>City</span><input required name="city" value={reviewForm.city} onChange={updateReview} placeholder="Bengaluru" /></label><label><span>Service</span><select name="service" value={reviewForm.service} onChange={updateReview}><option>Home cleaning</option><option>Maintenance</option><option>Repairs</option><option>Beauty at home</option></select></label><div className="review-rating"><span>Rating</span><div>{Array.from({ length: 5 }).map((_, index) => { const rating = index + 1; return <button className={rating <= reviewForm.rating ? "active" : ""} type="button" key={rating} onClick={() => setReviewForm((current) => ({ ...current, rating }))} aria-label={`${rating} star rating`}><Star size={18} fill="currentColor" /></button>; })}</div></div></div><label className="review-message"><span>Your review</span><textarea required name="text" value={reviewForm.text} onChange={updateReview} placeholder="Tell us what made the service feel effortless." /></label><button className="btn btn-primary" type="submit" disabled={reviewSaving}>{reviewSaving ? "Saving review..." : "Submit review"} {!reviewSaving && <ArrowRight size={15} />}</button></form></section></div></section>
     <section className="beauty-teaser shell"><div><span className="beauty-eyebrow">FunService beauty</span><h2>Glow<br /><i>Delivered.</i></h2><p>Salon rituals, skin care, grooming and celebration-ready details, all in the comfort of home.</p><Link className="btn btn-beauty" to="/beauty">Explore Beauty <ArrowRight size={16} /></Link></div><div className="beauty-collage"><div className="beauty-tile tile-one"><Flower2 /></div><div className="beauty-tile tile-two"><Sparkles /></div><div className="beauty-tile tile-three"><Scissors /></div></div></section>
@@ -316,37 +500,17 @@ function HomePage() {
   </main>;
 }
 
-function ServicesPage() {
-  const services = useCatalogServices();
-  const [filter, setFilter] = useState("All");
-  const [query, setQuery] = useState("");
-  const [expanded, setExpanded] = useState(null);
-  const normalizedQuery = query.trim().toLowerCase();
-  const visible = services.filter((service) => {
-    const matchesCategory = filter === "All" || service.category === filter;
-    const matchesQuery = !normalizedQuery || [service.title, service.category, service.description]
-      .some((value) => value.toLowerCase().includes(normalizedQuery));
-    return matchesCategory && matchesQuery;
-  });
-  return <main className="page shell services-page">
-    <div className="breadcrumb"><Link to="/">Home</Link><ChevronRight size={13} /><span>Services</span></div>
-    <div className="page-title-row"><div><span className="eyebrow">Service catalog</span><h1>Care for every corner.</h1><p>Browse trusted services with clear pricing and thoughtfully designed visits.</p></div><label className="search-box"><Search size={17} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search services" aria-label="Search services" /></label></div>
-    <div className="filter-row">{["All", "Cleaning", "Maintenance", "Repairs"].map((category) => <button className={filter === category ? "active" : ""} key={category} onClick={() => setFilter(category)}>{category}</button>)}</div>
-    {visible.length ? <div className="catalog-grid">{visible.map((service) => { const Icon = service.icon; const isExpanded = expanded === service.id; return <article className={`catalog-card ${isExpanded ? "expanded" : ""}`} key={service.id}><div className="catalog-photo"><img src={service.image} alt={service.title} /></div><div className="catalog-main"><span className="catalog-number">{String(services.indexOf(service) + 1).padStart(2, "0")}</span><span className="service-icon"><Icon size={22} /></span><div><span className="catalog-category">{service.category}</span><h3>{service.title}</h3><p>{service.description}</p></div><button aria-label={`Expand ${service.title}`} onClick={() => setExpanded(isExpanded ? null : service.id)}><ChevronDown size={19} /></button></div>{isExpanded && <div className="catalog-details"><div><span>Starting at</span><strong>₹{service.price}</strong></div><div><span>Typical visit</span><strong>{service.duration}</strong></div><div><span>Region</span><strong>{service.region || "All Regions"}</strong></div><Link className="btn btn-primary btn-small" to={`/book/${service.id}`}>Book now <ArrowRight size={15} /></Link></div>}</article>; })}</div> : <div className="catalog-empty"><Search size={24} /><strong>No services found.</strong><p>Try another search or choose a different category.</p><button className="btn btn-ghost btn-small" type="button" onClick={() => { setFilter("All"); setQuery(""); }}>Clear filters</button></div>}
-  </main>;
-}
+// ServicesPage removed
 
 function BeautyPage() {
   const [playingReel, setPlayingReel] = useState(false);
   const [selectedSalonId, setSelectedSalonId] = useState(beautySalons[0].id);
   const selectedSalon = beautySalons.find((salon) => salon.id === selectedSalonId) || beautySalons[0];
-  return <main className="beauty-page">
-    <section className="beauty-hero shell"><div><span className="beauty-eyebrow">Beauty by FunService</span><h1>Beauty At Your<br /><i>Doorstep.</i></h1><p>A little luxury, brought home. Expert salon and grooming experiences designed around your time.</p><a className="btn btn-beauty" href="#beauty-appointment">Book an appointment <ArrowRight size={16} /></a></div><div className="beauty-hero-art"><div className="beauty-arch"><img src="/images/site/beauty-salon.jpg" alt="At-home beauty service" /></div><div className="beauty-float"><Sparkles size={15} /> Personalized care</div></div></section>
-    <section className="shell beauty-appointment-section" id="beauty-appointment"><div className="beauty-heading"><span className="beauty-eyebrow">Owner-listed salons</span><h2>Choose your salon. Then choose your ritual.</h2><p>Every salon is reviewed by the owner before it appears here. Pick a partner and book a service with the same simple checkout used across FunService.</p></div><div className="beauty-salon-grid">{beautySalons.map((salon) => <button className={`beauty-salon-card ${selectedSalon.id === salon.id ? "selected" : ""}`} type="button" key={salon.id} onClick={() => setSelectedSalonId(salon.id)}><img src={salon.image} alt={salon.name} /><span className="beauty-salon-check"><BadgeCheck size={14} /> Owner listed</span><div><small>{salon.area}</small><h3>{salon.name}</h3><p>{salon.description}</p><strong><Star size={13} fill="currentColor" /> {salon.rating} rating</strong></div></button>)}</div><div className="beauty-salon-services"><div className="beauty-salon-services-head"><div><span className="beauty-eyebrow">Selected salon</span><h3>{selectedSalon.name}</h3><p>{selectedSalon.area} · Choose one service to continue to slot selection.</p></div><BadgeCheck size={22} /></div><div className="beauty-salon-service-grid">{selectedSalon.services.map((service) => { const Icon = service.icon; return <article key={service.id}><img src={service.image} alt={service.title} /><div><Icon size={19} /><h4>{service.title}</h4><p>{service.description}</p><span><strong>₹{service.price}</strong><small>{service.duration}</small></span><Link className="btn btn-beauty btn-small" to={`/book/beauty-${selectedSalon.id}-${service.id}`}>Book appointment <ArrowRight size={14} /></Link></div></article>; })}</div></div></section>
-    <section className="shell beauty-reel-section"><div className="beauty-reel-copy"><span className="beauty-eyebrow">Expert upload · 00:19</span><h2>A little preview before your appointment.</h2><p>Watch one of our beauty experts at work, then choose an at-home service that fits your ritual.</p><div className="beauty-expert"><img src="/images/site/expert-riya.jpg" alt="" /><div><strong>Riya Sharma</strong><span>Beauty expert · bridal and glow rituals</span></div></div><a className="btn btn-beauty" href="#beauty-appointment">Choose a salon <ArrowRight size={16} /></a></div><div className="beauty-reel">{playingReel ? <video controls autoPlay muted loop playsInline><source src="/videos/beauty-expert-reel.mp4" type="video/mp4" /></video> : <button className="beauty-reel-launch" type="button" onClick={() => setPlayingReel(true)} aria-label="Play beauty expert preview"><img src="/images/site/beauty-mehndi.jpg" alt="Beauty expert preview" /><span><PlayCircle size={42} /> Play expert preview</span></button>}<span><PlayCircle size={17} /> Uploaded by a verified beauty expert</span></div></section>
-    <section className="shell beauty-section"><div className="beauty-heading"><span className="beauty-eyebrow">The menu</span><h2>Your ritual. Your room.</h2></div><div className="beauty-grid">{beautyServices.map(([title, description, Icon, image], index) => <article key={title}><div className="beauty-card-photo"><img src={image} alt="" /></div><span>{String(index + 1).padStart(2, "0")}</span><Icon size={22} /><h3>{title}</h3><p>{description}</p><a href="#beauty-appointment">Choose salon <ArrowRight size={14} /></a></article>)}</div></section>
-    <section className="shell beauty-packages"><div className="beauty-heading"><span className="beauty-eyebrow">Curated bundles</span><h2>For your kind of occasion.</h2></div><div className="beauty-package-grid">{[["Everyday Glow", "A soft reset for busy weeks", "₹1,299"], ["Festival Ready", "A little extra polish for the calendar", "₹2,499"], ["Bridal Ritual", "A tailored pre-event care plan", "₹7,999"]].map(([name, copy, price]) => <article key={name}><Flower2 size={21} /><h3>{name}</h3><p>{copy}</p><strong>{price}</strong></article>)}</div></section>
-    <section className="shell gallery-section"><div className="beauty-heading"><span className="beauty-eyebrow">Moodboard</span><h2>Quietly indulgent.</h2></div><div className="beauty-gallery">{Array.from({ length: 6 }).map((_, index) => <div key={index} className={`gallery-tile gallery-${index + 1}`} />)}</div></section>
+  return <main className="beauty-page simple-beauty-page">
+    <section className="beauty-hero shell simple-beauty-hero"><div><span className="eyebrow">Beauty by FunService</span><h1>Beauty services, simply booked.</h1><p>Choose a salon listed by the owner, select a service, and book with the same clean checkout.</p><a className="btn btn-primary" href="#beauty-appointment">Book an appointment <ArrowRight size={16} /></a></div><div className="beauty-hero-art"><div className="beauty-arch"><img src="/images/site/beauty-salon.jpg" alt="At-home beauty service" /></div><div className="beauty-float"><Sparkles size={15} /> Verified beauty experts</div></div></section>
+    <section className="shell beauty-section beauty-services-overview"><div className="beauty-heading"><span className="eyebrow">Beauty services</span><h2>Salon Care, Grooming And Glow.</h2><p>Facials, waxing, threading, grooming, mehndi and nail art from partner beauty experts at home.</p></div><div className="beauty-grid">{beautyServices.map((service, index) => { const Icon = service.icon; const bookingId = service.bookingId || service.id; return <article key={service.id}><div className="beauty-card-photo"><img src={service.image} alt={service.title} /></div><span>{String(index + 1).padStart(2, "0")} · {service.duration}</span><Icon size={24} /><h3>{service.title}</h3><p>{service.description}</p><strong>From ₹{service.price}</strong><Link to={`/book/${bookingId}`}>Book beauty service <ArrowRight size={14} /></Link></article>; })}</div></section>
+    <section className="shell beauty-appointment-section" id="beauty-appointment"><div className="simple-section-title"><div><span className="eyebrow">Owner-listed salons</span><h2>Choose your salon</h2><p>Pick a partner and continue to a simple date-wise booking slot.</p></div></div><div className="beauty-salon-grid simple-salon-grid">{beautySalons.map((salon) => <button className={`beauty-salon-card ${selectedSalon.id === salon.id ? "selected" : ""}`} type="button" key={salon.id} onClick={() => setSelectedSalonId(salon.id)}><img src={salon.image} alt={salon.name} /><span className="beauty-salon-check"><BadgeCheck size={14} /> Owner listed</span><div><small>{salon.area}</small><h3>{salon.name}</h3><p>{salon.description}</p><strong><Star size={13} fill="currentColor" /> {salon.rating} rating</strong></div></button>)}</div><div className="simple-service-section beauty-salon-services"><div className="simple-section-title"><div><span className="eyebrow">Selected salon</span><h2>{selectedSalon.name}</h2><p>{selectedSalon.area} · Choose one service to continue.</p></div></div><div className="simple-catalog-grid">{selectedSalon.services.map((service) => { const Icon = service.icon; return <article className="simple-service-card" key={service.id}><Link to={`/book/beauty-${selectedSalon.id}-${service.id}`} className="simple-service-photo"><img src={service.image} alt={service.title} /><span><Icon size={14} /> Beauty</span></Link><div className="simple-service-body"><h3>{service.title}</h3><span className="simple-rating"><Star size={13} fill="currentColor" /> {selectedSalon.rating} ({service.duration})</span><div className="simple-price-row"><strong>₹{service.price}</strong><small>onwards</small></div><p>{service.description}</p><Link className="simple-add-btn" to={`/book/beauty-${selectedSalon.id}-${service.id}`}>Add</Link></div></article>; })}</div></div></section>
+    <section className="shell beauty-reel-section simple-reel-section"><div className="beauty-reel-copy"><span className="eyebrow">Expert upload</span><h2>Preview the service.</h2><p>Watch a short expert video, then choose the salon and service that fits.</p><div className="beauty-expert"><img src="/images/site/expert-riya.jpg" alt="" /><div><strong>Riya Sharma</strong><span>Beauty expert</span></div></div></div><div className="beauty-reel">{playingReel ? <video controls autoPlay muted loop playsInline><source src="/videos/beauty-expert-reel.mp4" type="video/mp4" /></video> : <button className="beauty-reel-launch" type="button" onClick={() => setPlayingReel(true)} aria-label="Play beauty expert preview"><img src="/images/site/beauty-mehndi.jpg" alt="Beauty expert preview" /><span><PlayCircle size={42} /> Play expert preview</span></button>}<span><PlayCircle size={17} /> Uploaded by a verified beauty expert</span></div></section>
   </main>;
 }
 
@@ -354,19 +518,92 @@ function PricingPage() {
   return <main className="page shell"><div className="centered-title"><span className="eyebrow">Membership</span><h1>Home care that<br />keeps up with life.</h1><p>Start small or hand us the whole list. Every plan includes verified professionals and transparent pricing.</p></div><PricingCards /><section className="plan-note"><LockKeyhole size={18} /><div><strong>Secure Stripe billing</strong><p>Upgrade, downgrade or cancel any time from your account.</p></div></section></main>;
 }
 
-function BookingPage() {
+function CartPage({ cartItems, onUpdateQuantity, onRemove }) {
+  const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+  return <main className="page shell cart-page">
+    <div className="breadcrumb"><Link to="/">Home</Link><ChevronRight size={13} /><span>Cart</span></div>
+    <div className="cart-head">
+      <div>
+        <span className="eyebrow">Your cart</span>
+        <h1>Services ready to book.</h1>
+        <p>Add services from the catalog, adjust quantity, then book the service you want.</p>
+      </div>
+      <Link className="btn btn-ghost btn-small" to="/services">Add more services <ArrowRight size={14} /></Link>
+    </div>
+
+    {cartItems.length ? (
+      <div className="cart-layout">
+        <section className="cart-list">
+          {cartItems.map((item) => (
+            <article className="cart-item" key={item.id}>
+              <img src={item.image} alt={item.title} />
+              <div className="cart-item-main">
+                <span className="eyebrow">{item.category}</span>
+                <h2>{item.title}</h2>
+                <p>{item.description || item.duration}</p>
+                <small>{item.duration} · ₹{item.price} each</small>
+              </div>
+              <div className="cart-item-actions">
+                <div className="quantity-control">
+                  <button type="button" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1}>-</button>
+                  <b>{item.quantity}</b>
+                  <button type="button" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)} disabled={item.quantity >= 10}>+</button>
+                </div>
+                <strong>₹{item.price * item.quantity}</strong>
+                <Link className="btn btn-primary btn-small" to={`/book/${encodeURIComponent(item.id)}`}>Book this</Link>
+                <button className="btn btn-ghost btn-small" type="button" onClick={() => onRemove(item.id)}>Remove</button>
+              </div>
+            </article>
+          ))}
+        </section>
+        <aside className="cart-total-card">
+          <span className="eyebrow">Cart total</span>
+          <strong>₹{total}</strong>
+          <p>{cartItems.length} service{cartItems.length > 1 ? "s" : ""} added. Choose “Book this” on any item to continue checkout.</p>
+        </aside>
+      </div>
+    ) : (
+      <section className="cart-empty">
+        <ShoppingCart size={34} />
+        <h2>Your cart is empty.</h2>
+        <p>Add services from the catalog and they will show here.</p>
+        <Link className="btn btn-primary" to="/services">Browse services <ArrowRight size={15} /></Link>
+      </section>
+    )}
+  </main>;
+}
+
+const defaultSlotTimes = ["09:00 AM", "10:30 AM", "12:00 PM", "03:30 PM", "05:00 PM", "06:30 PM"];
+
+const nextThreeBookingDays = () => Array.from({ length: 3 }, (_, index) => {
+  const date = new Date();
+  date.setDate(date.getDate() + index);
+  return {
+    key: date.toISOString().slice(0, 10),
+    weekday: date.toLocaleDateString("en-IN", { weekday: "short" }).toUpperCase(),
+    day: date.toLocaleDateString("en-IN", { day: "2-digit" }),
+    label: date.toLocaleDateString("en-IN", { month: "short", day: "2-digit", year: "numeric" })
+  };
+});
+
+function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
   const { serviceId } = useParams();
   const navigate = useNavigate();
   const catalogServices = useCatalogServices();
   const activeService = catalogServices.find((service) => service.id === serviceId || service._id === serviceId) || beautyAppointments.find((service) => service.id === serviceId) || { id: serviceId, title: serviceId === "beauty-at-home" ? "Beauty At Home" : "Selected Service", description: "A verified FunService professional, booked around your day.", price: serviceId === "beauty-at-home" ? 999 : 499, icon: Sparkles };
-  const [step, setStep] = useState(1), [selectedDate, setSelectedDate] = useState("02"), [selectedTime, setSelectedTime] = useState("10:30 AM");
+  const activeServiceCartId = getServiceCartId(activeService);
+  const cartItem = cartItems.find((item) => item.id === activeServiceCartId || item.id === serviceId);
+  const bookingDays = useMemo(() => nextThreeBookingDays(), []);
+  const firstAvailableDay = bookingDays[0];
+  const [step, setStep] = useState(1), [selectedDate, setSelectedDate] = useState(firstAvailableDay.key), [selectedTime, setSelectedTime] = useState(defaultSlotTimes[0]);
+  const [quantity, setQuantity] = useState(cartItem?.quantity || 1);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [customer, setCustomer] = useState({ name: "", phone: "", address: "" });
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("");
   const [processing, setProcessing] = useState(false);
-  const [confirmedBooking, setConfirmedBooking] = useState(null);
   const Icon = activeService.icon;
 
   const paymentIcons = {
@@ -376,6 +613,17 @@ function BookingPage() {
     "Wallet": WalletCards,
     "Cash on Service": Banknote
   };
+  const unitPrice = Number(activeService.price) || 0;
+  const bookingTotal = unitPrice * quantity;
+  const updateQuantity = (nextQuantity) => {
+    const safeQuantity = Math.max(1, Math.min(10, nextQuantity));
+    setQuantity(safeQuantity);
+    if (cartItem) onUpdateCartQuantity?.(cartItem.id, safeQuantity);
+  };
+
+  useEffect(() => {
+    if (cartItem?.quantity) setQuantity(cartItem.quantity);
+  }, [cartItem?.quantity]);
 
   useEffect(() => {
     const unsubscribe = onSessionChanged(async (nextUser) => {
@@ -401,12 +649,12 @@ function BookingPage() {
       try {
         const methods = await api.getPaymentMethods();
         setPaymentMethods(methods);
-        setPaymentMethod((current) => current || methods[0]?.method || "");
+        setPaymentMethod((current) => current || methods.find(m => m.enabled !== false)?.method || methods[0]?.method || "");
       } catch {
         const fallback = [
-          { method: "UPI", type: "online", description: "Pay securely with any UPI app." },
-          { method: "Debit/Credit Card", type: "online", description: "Pay with a debit or credit card." },
-          { method: "Cash on Service", type: "cash", description: "Pay the professional after the service." }
+          { method: "UPI", type: "online", description: "Pay securely with any UPI app.", enabled: true },
+          { method: "Debit/Credit Card", type: "online", description: "Pay with a debit or credit card.", enabled: true },
+          { method: "Cash on Service", type: "cash", description: "Pay the professional after the service.", enabled: true }
         ];
         setPaymentMethods(fallback);
         setPaymentMethod((current) => current || fallback[0].method);
@@ -415,6 +663,12 @@ function BookingPage() {
 
     loadPaymentMethods();
   }, []);
+
+  useEffect(() => {
+    if (!bookingDays.some((day) => day.key === selectedDate)) {
+      setSelectedDate(firstAvailableDay.key);
+    }
+  }, [bookingDays, firstAvailableDay.key, selectedDate]);
 
   const updateCustomer = (event) => {
     const { name, value } = event.target;
@@ -427,6 +681,18 @@ function BookingPage() {
       return;
     }
     setStep(3);
+  };
+
+  const continueFromSlot = () => {
+    if (!customer.phone.trim()) {
+      toast.error("Mobile number is required for direct booking.");
+      return;
+    }
+    if (!isPhoneLike(customer.phone)) {
+      toast.error("Enter a valid mobile number (e.g. +91 98765 43210).");
+      return;
+    }
+    setStep(2);
   };
 
   const confirmBooking = async () => {
@@ -465,102 +731,132 @@ function BookingPage() {
 
       const booking = await saveUserBooking(user, {
         serviceId: activeService.id,
-        serviceName: activeService.title,
+        serviceName: quantity > 1 ? `${activeService.title} x ${quantity}` : activeService.title,
         customerName: customer.name.trim(),
         phone: customer.phone.trim(),
         address: customer.address.trim(),
-        date: `June ${selectedDate}, 2026`,
+        date: bookingDays.find((day) => day.key === selectedDate)?.label || selectedDate,
         time: selectedTime,
-        amount: activeService.price,
+        amount: bookingTotal,
         salonName: activeService.salonName || "",
         paymentMethod,
         paymentStatus
       });
-      setConfirmedBooking(booking);
-      setStep(4);
+      toast.success(
+        paymentStatus === "Paid" ? "Payment complete. Opening booking history." : "Booking confirmed. Opening booking history."
+      );
+      navigate(`/`);
     } catch (error) {
       toast.error(error.message || "Could not confirm your booking.");
     } finally {
       setProcessing(false);
     }
   };
+  const selectedPaymentType = paymentMethods.find(({ method }) => method === paymentMethod)?.type;
+  const isCashBooking = selectedPaymentType === "cash";
+  const noPaymentMethods = paymentMethods.length === 0;
+  const selectedDayLabel = bookingDays.find((day) => day.key === selectedDate)?.label || selectedDate;
 
-  return <main className="booking-page shell">
+  const isServiceDisabled = activeService.enabled === false;
+
+  return <main className="booking-page shell simple-booking-page">
     <div className="breadcrumb"><Link to="/">Home</Link><ChevronRight size={13} /><Link to="/services">Services</Link><ChevronRight size={13} /><span>Book</span></div>
-    <div className="booking-layout"><aside className="booking-summary"><span className="eyebrow">Your booking</span><span className="booking-service-icon"><Icon size={26} /></span><h2>{activeService.title}</h2><p>{activeService.description}</p>{activeService.salonName && <div className="summary-line"><span>Salon partner</span><strong>{activeService.salonName}</strong></div>}<div className="summary-line"><span>Professional visit</span><strong>₹{activeService.price}</strong></div><div className="summary-line"><span>Platform protection</span><strong>Included</strong></div><div className="summary-total"><span>Total</span><strong>₹{activeService.price}</strong></div></aside>
-      <section className="booking-panel"><div className="booking-steps">{["Slot", "Address", "Payment", "Done"].map((label, index) => <span className={step >= index + 1 ? "active" : ""} key={label}><b>{index + 1}</b>{label}</span>)}</div>
-      {step === 1 && <div className="booking-form"><span className="eyebrow">Step 01</span><h1>Choose a time that works.</h1><div className="calendar-card"><div className="calendar-head"><strong>June 2026</strong><span>Next available slots</span></div><div className="date-row">{[["MON", "01"], ["TUE", "02"], ["WED", "03"], ["THU", "04"], ["FRI", "05"], ["SAT", "06"]].map(([day, date]) => <button key={date} className={selectedDate === date ? "active" : ""} onClick={() => setSelectedDate(date)}><span>{day}</span><b>{date}</b></button>)}</div></div><div className="time-grid">{["09:00 AM", "10:30 AM", "12:00 PM", "03:30 PM", "05:00 PM", "06:30 PM"].map((time) => <button className={selectedTime === time ? "active" : ""} key={time} onClick={() => setSelectedTime(time)}>{time}</button>)}</div><button className="btn btn-primary" onClick={() => setStep(2)}>Continue to address <ArrowRight size={16} /></button></div>}
-      {step === 2 && <div className="booking-form"><span className="eyebrow">Step 02</span><h1>Where should we arrive?</h1><label><span>Full name</span><input name="name" value={customer.name} onChange={updateCustomer} placeholder="Your name" /></label><label><span>Phone number</span><input name="phone" value={customer.phone} onChange={updateCustomer} placeholder="+91 98765 43210" /></label><label><span>Service address</span><textarea name="address" value={customer.address} onChange={updateCustomer} placeholder="Flat, building, street and landmark" /></label><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(1)}>Back</button><button className="btn btn-primary" onClick={openPayment}>Review payment <ArrowRight size={16} /></button></div></div>}
-      {step === 3 && <div className="booking-form"><span className="eyebrow">Step 03</span><h1>Choose how to pay.</h1><div className="payment-method-grid">{paymentMethods.map((method) => { const PaymentIcon = paymentIcons[method.method] || CreditCard; return <button type="button" className={`payment-method ${paymentMethod === method.method ? "active" : ""}`} onClick={() => setPaymentMethod(method.method)} key={method.method}><PaymentIcon size={20} /><span><strong>{method.method}</strong><small>{method.description}</small></span>{paymentMethod === method.method && <CheckCircle2 size={17} />}</button>; })}</div>{!paymentMethods.length && <p className="payment-empty">No payment method is available right now. Please contact support.</p>}<div className="review-box"><span>June {selectedDate}, 2026 at {selectedTime}</span><strong>₹{activeService.price}</strong></div><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button><button className="btn btn-primary" onClick={confirmBooking} disabled={processing || !paymentMethods.length}>{processing ? "Checking payment status..." : paymentMethods.find(({ method }) => method === paymentMethod)?.type === "cash" ? "Confirm cash booking" : "Pay and confirm"} {!processing && <ArrowRight size={16} />}</button></div></div>}
-      {step === 4 && <div className="booking-done"><BookingConfirmationAnimation paymentStatus={confirmedBooking?.paymentStatus} /><span className="done-icon"><CheckCircle2 size={38} /></span><span className="eyebrow">{confirmedBooking?.paymentStatus === "Paid" ? "Payment confirmed" : "Booking confirmed"}</span><h1>Your home is on our list.</h1><p>{confirmedBooking?.paymentStatus === "Paid" ? "Your payment is complete. " : "Cash on service selected. "}A verified professional will arrive on June {selectedDate} at {selectedTime}.</p><Link className="btn btn-primary" to="/profile">View my booking <ArrowRight size={16} /></Link></div>}
+    <div className="booking-layout simple-booking-layout"><aside className="booking-summary simple-booking-sidebar"><span className="eyebrow">Booking steps</span><h2>{activeService.title}</h2><p>{activeService.description}</p><div className="simple-step-list">{[["Slot", CalendarDays, step >= 1], ["Address", Home, step >= 2], ["Payment", CreditCard, step >= 3]].map(([label, StepIcon, active]) => <button className={active ? "active" : ""} type="button" key={label}><StepIcon size={16} /><span>{label}</span></button>)}</div>{activeService.salonName && <div className="summary-line"><span>Salon partner</span><strong>{activeService.salonName}</strong></div>}<div className="summary-line"><span>Selected slot</span><strong>{selectedDayLabel}, {selectedTime}</strong></div><div className="summary-line"><span>Quantity</span><strong>{quantity}</strong></div></aside>
+      <section className="booking-panel">
+      {isServiceDisabled ? (
+        <div className="booking-form" style={{ display: "grid", placeItems: "center", textAlign: "center", padding: "40px 20px" }}>
+          <Sparkles size={48} style={{ color: "var(--accent)", marginBottom: "16px" }} />
+          <h1>This service is Coming Soon!</h1>
+          <p style={{ maxWidth: "400px", margin: "8px 0 24px", color: "var(--muted)" }}>
+            We're currently setting up this service with verified professionals in your region. Check back soon!
+          </p>
+          <Link className="btn btn-primary" to="/services">Explore other services <ArrowRight size={16} /></Link>
+        </div>
+      ) : (
+        <>
+          <div className="booking-steps">{["Slot", "Address", "Payment"].map((label, index) => <span className={step >= index + 1 ? "active" : ""} key={label}><b>{index + 1}</b>{label}</span>)}</div>
+          {step === 1 && <div className="booking-form"><span className="eyebrow">Step 01</span><h1>Choose a time that works.</h1><label><span>Mobile number</span><input name="phone" value={customer.phone} onChange={updateCustomer} placeholder="+91 98765 43210" /></label><div className="calendar-card"><div className="calendar-head"><strong>Next 3 days</strong><span>Available slots</span></div><div className="date-row three-day-row">{bookingDays.map((day) => <button key={day.key} className={selectedDate === day.key ? "active" : ""} onClick={() => setSelectedDate(day.key)}><span>{day.weekday}</span><b>{day.day}</b></button>)}</div></div><div className="time-grid">{defaultSlotTimes.map((time) => <button className={selectedTime === time ? "active" : ""} key={time} onClick={() => setSelectedTime(time)}>{time}</button>)}</div><button className="btn btn-primary" onClick={continueFromSlot}>Continue to address <ArrowRight size={16} /></button></div>}
+          {step === 2 && <div className="booking-form"><span className="eyebrow">Step 02</span><h1>Where should we arrive?</h1><label><span>Full name</span><input name="name" value={customer.name} onChange={updateCustomer} placeholder="Your name" /></label><label><span>Phone number</span><input name="phone" value={customer.phone} onChange={updateCustomer} placeholder="+91 98765 43210" /></label><label><span>Service address</span><textarea name="address" value={customer.address} onChange={updateCustomer} placeholder="Flat, building, street and landmark" /></label><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(1)}>Back</button><button className="btn btn-primary" onClick={openPayment}>Review payment <ArrowRight size={16} /></button></div></div>}
+          {step === 3 && <div className="booking-form"><span className="eyebrow">Step 03</span><h1>Choose how to pay.</h1><div className="booking-quantity-box"><div><span>Quantity</span><strong>{quantity} service{quantity > 1 ? "s" : ""}</strong><small>₹{unitPrice} each</small></div><div className="quantity-control"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div>
+            <div className="payment-method-grid">
+              {paymentMethods.map((method) => {
+                const PaymentIcon = paymentIcons[method.method] || CreditCard;
+                const isMethodDisabled = method.enabled === false;
+                return (
+                  <button
+                    type="button"
+                    className={`payment-method ${paymentMethod === method.method ? "active" : ""} ${isMethodDisabled ? "disabled" : ""}`}
+                    style={isMethodDisabled ? { opacity: 0.5, cursor: "not-allowed" } : {}}
+                    onClick={() => {
+                      if (!isMethodDisabled) setPaymentMethod(method.method);
+                    }}
+                    disabled={isMethodDisabled}
+                    key={method.method}
+                  >
+                    <PaymentIcon size={20} />
+                    <span>
+                      <strong>
+                        {method.method} {isMethodDisabled && <span style={{ color: "var(--accent)", fontSize: "10px", marginLeft: "6px" }}>(Coming Soon)</span>}
+                      </strong>
+                      <small>{method.description}</small>
+                    </span>
+                    {paymentMethod === method.method && !isMethodDisabled && <CheckCircle2 size={17} />}
+                  </button>
+                );
+              })}
+            </div>
+            {!paymentMethods.length && <p className="payment-empty">No payment method is available right now. Please contact support.</p>}<div className="review-box"><span>{selectedDayLabel} at {selectedTime} · Qty {quantity}</span><strong>₹{bookingTotal}</strong></div><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button><button className="btn btn-primary" onClick={confirmBooking} disabled={processing || !paymentMethods.length}>{processing ? "Checking payment status..." : paymentMethods.find(({ method }) => method === paymentMethod)?.type === "cash" ? "Confirm cash booking" : "Pay and confirm"} {!processing && <ArrowRight size={16} />}</button></div></div>}
+        </>
+      )}
       </section>
+      <aside className="simple-cart-column">
+        <article className="simple-promise-card"><div><h3>Fun Promise</h3><p><Check size={15} /> Verified professionals</p><p><Check size={15} /> Hassle-free booking</p><p><Check size={15} /> Transparent pricing</p></div><span className="quality-stamp">Quality<br />Assured</span></article>
+        <article className="simple-cart-card"><h3>Cart</h3><div className="simple-cart-line"><span>{activeService.title}</span><strong>₹{unitPrice}</strong></div><small>{selectedPaymentType === "cash" ? "Cash on service" : "Online payment"} · {selectedDayLabel}, {selectedTime}</small><div className="cart-quantity-row"><span>Quantity</span><div className="quantity-control compact"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div><div className="simple-savings"><BadgeCheck size={14} /> Platform protection included</div><div className="simple-cart-total"><span>Amount to pay</span><strong>₹{bookingTotal}</strong></div><button className="btn btn-primary" type="button" onClick={() => step < 2 ? setStep(2) : step < 3 ? openPayment() : confirmBooking()} disabled={processing || isServiceDisabled || (step === 3 && !paymentMethods.length)}>{isServiceDisabled ? "Coming Soon" : step < 3 ? "Continue" : processing ? "Checking..." : "Confirm booking"}</button></article>
+      </aside>
     </div>
-    {confirmedBooking && <div className="booking-confirmation-backdrop"><section className="booking-confirmation-popup" role="dialog" aria-modal="true" aria-label="Booking confirmed"><BookingConfirmationAnimation compact paymentStatus={confirmedBooking.paymentStatus} /><span className="eyebrow">{confirmedBooking.paymentStatus === "Paid" ? "Payment confirmed" : "Booking confirmed"}</span><h2>{activeService.title} is booked.</h2><p>{confirmedBooking.paymentStatus === "Paid" ? "Online payment complete. " : "Cash on service selected. "}Your booking ID is <strong>{confirmedBooking.bookingId}</strong>.</p><div className="popup-actions"><button className="btn btn-ghost" onClick={() => setConfirmedBooking(null)}>Close</button><Link className="btn btn-primary" to="/profile">View booking <ArrowRight size={15} /></Link></div></section></div>}
   </main>;
 }
 
 function DashboardPage() {
-  const navigate = useNavigate();
-  const [profile, setProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = onSessionChanged(async (user) => {
-      if (!user) {
-        navigate("/auth", { replace: true });
-        return;
-      }
-
-      const savedProfile = await getUserProfile(user);
-      if (!savedProfile) {
-        navigate("/profile", { replace: true });
-        return;
-      }
-
-      setProfile(savedProfile);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [navigate]);
-
-  if (loading || !profile) {
-    return <main className="dashboard-page shell"><p>Loading your account...</p></main>;
-  }
-
-  const firstName = profile.name.split(" ")[0];
-  const initials = profile.name.slice(0, 2).toUpperCase();
-  const memberSince = typeof profile.createdAt === "string"
-    ? new Date(profile.createdAt).getFullYear()
-    : profile.createdAt?.toDate?.().getFullYear() || new Date().getFullYear();
-  const logout = async () => {
-    await logoutSession();
-    navigate("/auth");
-  };
-
-  return <main className="dashboard-page shell"><aside className="account-sidebar"><div className="user-pill"><span>{initials}</span><div><strong>{profile.name}</strong><small>Member since {memberSince}</small></div></div>{[["My bookings", CalendarDays, () => {}], ["Profile", UserRound, () => navigate("/profile")], ["Payments", CreditCard, () => {}], ["Notifications", Bell, () => {}], ["Logout", LogOut, logout]].map(([label, Icon, action], index) => <button className={index === 0 ? "active" : ""} key={label} onClick={action}><Icon size={17} /> {label}</button>)}</aside><section><div className="dashboard-head"><div><span className="eyebrow">My account</span><h1>Good morning, {firstName}.</h1><p>Your home care schedule is looking pleasantly light.</p></div><Link className="btn btn-primary btn-small" to="/services">Book a service <ArrowRight size={15} /></Link></div><article className="upcoming-card"><div><span className="eyebrow">Next visit</span><h2>Home Deep Clean</h2><p>Tuesday, June 02 at 10:30 AM</p></div><span className="visit-badge">Professional assigned</span><div className="assigned"><span>RK</span><div><strong>Ravi Kumar</strong><small>4.9 rating · 244 visits</small></div></div></article><div className="dashboard-grid"><article className="dashboard-panel"><div className="panel-title-row"><h3>Profile details</h3><Link to="/profile">Edit profile <ArrowRight size={13} /></Link></div><div className="profile-summary-grid"><span><small>Email</small><strong>{profile.email || "Not added"}</strong></span><span><small>Phone</small><strong>{profile.phone}</strong></span><span><small>Address</small><strong>{profile.address}, {profile.city}</strong></span></div></article><article className="dashboard-panel plan-panel"><h3>Your care plan</h3><span className="plan-name">Standard</span><p>2 of 3 monthly service credits available.</p><div className="progress"><span /></div><Link to="/pricing">Manage membership <ArrowRight size={14} /></Link></article></div></section></main>;
+  return <Profile dashboardLayout />;
 }
 
 function AdminPage() {
   const initial = Object.fromEntries(checklistGroups.flatMap(([, items]) => items.map((item, index) => [item, index % 3 === 0])));
   const [checks, setChecks] = useState(initial), completed = Object.values(checks).filter(Boolean).length, total = Object.keys(checks).length;
-  return <main className="admin-page shell"><div className="admin-head"><div><span className="eyebrow">Protected admin</span><h1>Launch control.</h1><p>Track the final details before FunService goes live.</p></div><span className="secure-chip"><LockKeyhole size={15} /> Firebase custom claim required</span></div><div className="admin-stats">{[["₹2.4L", "Monthly bookings"], ["1,284", "Active customers"], ["4.91", "Average rating"], [`${completed}/${total}`, "Launch checks done"]].map(([value, label]) => <article key={label}><strong>{value}</strong><span>{label}</span></article>)}</div><div className="admin-grid"><section className="checklist-panel"><div className="panel-head"><div><span className="eyebrow">Pre-launch checklist</span><h2>Production readiness</h2></div><Gauge size={22} /></div>{checklistGroups.map(([group, items]) => <div className="check-group" key={group}><h3>{group}</h3>{items.map((item) => <label key={item}><input type="checkbox" checked={checks[item]} onChange={() => setChecks({ ...checks, [item]: !checks[item] })} /><span>{item}</span></label>)}</div>)}</section><aside className="admin-side"><article><div className="panel-head"><h3>Dependency scanner</h3><ScanLine size={18} /></div><div className="scan-status"><CheckCircle2 size={18} /><div><strong>Healthy</strong><span>0 critical vulnerabilities</span></div></div><button className="btn btn-ghost btn-small">Run npm audit</button></article><article><div className="panel-head"><h3>Recent activity</h3><Bell size={18} /></div>{["New booking · Mumbai", "Payment captured · ₹999", "New review · 5 stars"].map((item) => <p className="activity" key={item}>{item}</p>)}</article></aside></div></main>;
+  return <main className="admin-page shell"><div className="admin-head"><div><span className="eyebrow">Protected control</span><h1>Launch control.</h1><p>Track the final details before FunService goes live.</p></div><span className="secure-chip"><LockKeyhole size={15} /> Firebase custom claim required</span></div><div className="admin-stats">{[["₹2.4L", "Monthly bookings"], ["1,284", "Active customers"], ["4.91", "Average rating"], [`${completed}/${total}`, "Launch checks done"]].map(([value, label]) => <article key={label}><strong>{value}</strong><span>{label}</span></article>)}</div><div className="admin-grid"><section className="checklist-panel"><div className="panel-head"><div><span className="eyebrow">Pre-launch checklist</span><h2>Production readiness</h2></div><Gauge size={22} /></div>{checklistGroups.map(([group, items]) => <div className="check-group" key={group}><h3>{group}</h3>{items.map((item) => <label key={item}><input type="checkbox" checked={checks[item]} onChange={() => setChecks({ ...checks, [item]: !checks[item] })} /><span>{item}</span></label>)}</div>)}</section><aside className="admin-side"><article><div className="panel-head"><h3>Dependency scanner</h3><ScanLine size={18} /></div><div className="scan-status"><CheckCircle2 size={18} /><div><strong>Healthy</strong><span>0 critical vulnerabilities</span></div></div><button className="btn btn-ghost btn-small">Run npm audit</button></article><article><div className="panel-head"><h3>Recent activity</h3><Bell size={18} /></div>{["New booking · Mumbai", "Payment captured · ₹999", "New review · 5 stars"].map((item) => <p className="activity" key={item}>{item}</p>)}</article></aside></div></main>;
 }
 
 function ContactPage() {
   const [sent, setSent] = useState(false);
+  const [ticketId, setTicketId] = useState("");
   const [sending, setSending] = useState(false);
+  const [user, setUser] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", type: "General support", message: "" });
   const update = (event) => setForm({ ...form, [event.target.name]: event.target.value });
+
+  useEffect(() => onSessionChanged((nextUser) => {
+    setUser(nextUser);
+    if (!nextUser) return;
+
+    setForm((current) => ({
+      ...current,
+      name: current.name || displayUserName(nextUser),
+      email: current.email || nextUser.email || ""
+    }));
+  }), []);
+
   const submit = async (event) => {
     event.preventDefault();
     setSending(true);
     try {
-      await api.createSupportMessage({
+      const response = await api.createSupportMessage({
+        userId: user?._id || user?.uid,
         name: form.name.trim(),
         email: form.email.trim(),
         message: `${form.type}: ${form.message.trim()}`
       });
+      setTicketId(response.supportMessage?.ticketId || "");
       setSent(true);
     } catch (error) {
       toast.error(error.message || "Unable to send your message.");
@@ -568,7 +864,58 @@ function ContactPage() {
       setSending(false);
     }
   };
-  return <main className="page shell"><div className="contact-layout"><section><span className="eyebrow">Support</span><h1>We are here<br />when you need us.</h1><p>Tell us what is happening and the care team will get back to you shortly.</p><div className="contact-list"><span><MessageCircle size={18} /><b>WhatsApp</b><small>+91 98765 43210</small></span><span><Mail size={18} /><b>Email</b><small>support@funservice.in</small></span><span><Phone size={18} /><b>Call</b><small>Mon-Sun, 8 AM-10 PM</small></span></div></section><form className="contact-form" onSubmit={submit}>{sent ? <div className="form-success"><CheckCircle2 size={34} /><h2>Message received.</h2><p>We will be in touch shortly.</p></div> : <><h2>How can we help?</h2><label><span>Name</span><input required name="name" value={form.name} onChange={update} placeholder="Your name" /></label><label><span>Email</span><input required name="email" value={form.email} onChange={update} type="email" placeholder="you@example.com" /></label><label><span>Type</span><select name="type" value={form.type} onChange={update}><option>General support</option><option>Booking help</option><option>Bug report</option><option>Payment issue</option></select></label><label><span>Message</span><textarea required name="message" value={form.message} onChange={update} placeholder="Tell us a little more" /></label><button className="btn btn-primary" disabled={sending}>{sending ? "Sending..." : "Send message"} {!sending && <ArrowRight size={16} />}</button></>}</form></div></main>;
+
+  return <main className="page shell">
+    <div className="contact-layout">
+      <section>
+        <span className="eyebrow">Support</span>
+        <h1>We are here<br />when you need us.</h1>
+        <p>Tell us what is happening and the care team will get back to you shortly.</p>
+        <div className="contact-list">
+          <span><MessageCircle size={18} /><b>WhatsApp</b><small>+91 98765 43210</small></span>
+          <span><Mail size={18} /><b>Email</b><small>support@funservice.in</small></span>
+          <span><Phone size={18} /><b>Call</b><small>Mon-Sun, 8 AM-10 PM</small></span>
+        </div>
+      </section>
+      <form className="contact-form" onSubmit={submit}>
+        {sent ? (
+          <div className="form-success">
+            <CheckCircle2 size={34} />
+            <h2>Message received.</h2>
+            <p>{ticketId ? `Ticket ID: ${ticketId}` : "We will be in touch shortly."}</p>
+          </div>
+        ) : (
+          <>
+            <h2>How can we help?</h2>
+            <label>
+              <span>Name</span>
+              <input required name="name" value={form.name} onChange={update} placeholder="Your name" />
+            </label>
+            <label>
+              <span>Email</span>
+              <input required name="email" value={form.email} onChange={update} type="email" placeholder="you@example.com" />
+            </label>
+            <label>
+              <span>Type</span>
+              <select name="type" value={form.type} onChange={update}>
+                <option>General support</option>
+                <option>Booking help</option>
+                <option>Bug report</option>
+                <option>Payment issue</option>
+              </select>
+            </label>
+            <label>
+              <span>Message</span>
+              <textarea required name="message" value={form.message} onChange={update} placeholder="Tell us a little more" />
+            </label>
+            <button className="btn btn-primary" disabled={sending}>
+              {sending ? "Sending..." : "Send message"} {!sending && <ArrowRight size={16} />}
+            </button>
+          </>
+        )}
+      </form>
+    </div>
+  </main>;
 }
 
 function LegalPage({ title, type }) {
@@ -577,7 +924,7 @@ function LegalPage({ title, type }) {
 }
 
 function Footer() {
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Your home. Handled. Trusted care for homes that have enough going on.</p></div><div><h4>Services</h4><Link to="/services">Home cleaning</Link><Link to="/services">Maintenance</Link><Link to="/beauty">Beauty at home</Link><Link to="/pricing">Care plans</Link></div><div><h4>Company</h4><Link to="/contact">Contact</Link><Link to="/privacy">Privacy policy</Link><Link to="/terms">Terms of service</Link><Link to="/cookies">Cookie policy</Link></div><div><h4>Connect</h4><a href="https://instagram.com"><Instagram size={15} /> Instagram</a><a href="https://wa.me/919876543210"><MessageCircle size={15} /> WhatsApp</a><span className="footer-note">Made for urban India</span></div></div><div className="shell footer-bottom"><span>© 2026 FunService</span><span>Securely booked. Thoughtfully delivered.</span></div></footer>;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Your home. Handled. Trusted care for homes that have enough going on.</p></div><div><h4>Services</h4><Link to="/services">Home cleaning</Link><Link to="/services">Maintenance</Link><Link to="/beauty">Beauty at home</Link><Link to="/pricing">Care plans</Link></div><div><h4>Company</h4><Link to="/vision">AI Vision</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy policy</Link><Link to="/terms">Terms of service</Link><Link to="/cookies">Cookie policy</Link></div><div><h4>Connect</h4><a href="https://instagram.com"><Instagram size={15} /> Instagram</a><a href="https://wa.me/919876543210"><MessageCircle size={15} /> WhatsApp</a><span className="footer-note">Made for urban India</span></div></div><div className="shell footer-bottom"><span>© 2026 FunService. All rights reserved.</span><span>Securely booked. Thoughtfully delivered.</span></div></footer>;
 }
 
 function CookieBanner() {
@@ -622,7 +969,64 @@ function AiGeneratorPage() {
 
 function App() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const services = useCatalogServices();
+  const generalServices = useMemo(() => getGeneralCatalogServices(services), [services]);
+  const searchableServices = useMemo(
+    () => [...generalServices, ...beautyServices.map(normalizeService)],
+    [generalServices]
+  );
+  const [cartItems, setCartItems] = useState(readCartItems);
+  const [sessionUser, setSessionUser] = useState(null);
+  const [loginPopupOpen, setLoginPopupOpen] = useState(false);
   const ownerRoute = location.pathname === "/owner" || location.pathname === "/backend";
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const authRoute = location.pathname === "/auth" || location.pathname === "/login";
+
+  useEffect(() => onSessionChanged(setSessionUser), []);
+
+  useEffect(() => {
+    if (sessionUser || ownerRoute || authRoute) {
+      setLoginPopupOpen(false);
+      return;
+    }
+    setLoginPopupOpen(true);
+  }, [sessionUser, ownerRoute, authRoute, location.pathname]);
+
+  const updateCart = (updater) => {
+    setCartItems((current) => saveCartItems(updater(current)));
+  };
+
+  const addToCart = (service) => {
+    const item = normalizeCartItem(service);
+    if (!item.id || !item.title) return;
+
+    updateCart((current) => {
+      const existing = current.find((cartItem) => cartItem.id === item.id);
+      if (existing) {
+        return current.map((cartItem) =>
+          cartItem.id === item.id
+            ? { ...cartItem, quantity: Math.min(10, cartItem.quantity + 1) }
+            : cartItem
+        );
+      }
+      return [...current, item];
+    });
+    navigate(`/book/${item.id}`);
+  };
+
+  const updateCartQuantity = (id, quantity) => {
+    updateCart((current) =>
+      current.map((item) =>
+        item.id === id ? { ...item, quantity: Math.max(1, Math.min(10, quantity)) } : item
+      )
+    );
+  };
+
+  const removeFromCart = (id) => {
+    updateCart((current) => current.filter((item) => item.id !== id));
+    toast.success("Service removed from cart.");
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -630,16 +1034,16 @@ function App() {
 
   return (
     <>
-      <Toaster position="top-right" />
-      {!ownerRoute && <Navbar />}
+      {!ownerRoute && <Navbar cartCount={cartCount} />}
       <div className="route-stage" key={location.pathname}>
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/services" element={<ServicesPage />} />
+          <Route path="/" element={<HomePage onBookService={addToCart} />} />
+          <Route path="/services" element={<Services services={generalServices} searchableServices={searchableServices} onBookService={addToCart} />} />
+          <Route path="/cart" element={<CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} />} />
           <Route path="/beauty" element={<BeautyPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/vision" element={<AiGeneratorPage />} />
-          <Route path="/book/:serviceId" element={<BookingPage />} />
+          <Route path="/book/:serviceId" element={<BookingPage cartItems={cartItems} onUpdateCartQuantity={updateCartQuantity} />} />
           <Route path="/auth" element={<LoginSignup />} />
           <Route path="/login" element={<Navigate to="/auth" replace />} />
           <Route path="/dashboard" element={<DashboardPage />} />
@@ -650,6 +1054,9 @@ function App() {
           <Route path="/admin" element={<Navigate to="/owner" replace />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/support" element={<Navigate to="/contact" replace />} />
+          <Route path="/history" element={<Navigate to="/profile?tab=history" replace />} />
+          <Route path="/booking-status" element={<Navigate to="/profile" replace />} />
+          <Route path="/booking-status/:bookingId" element={<BookingStatus />} />
           <Route path="/privacy" element={<LegalPage title="Privacy Policy" type="privacy" />} />
           <Route path="/terms" element={<LegalPage title="Terms of Service" type="terms" />} />
           <Route path="/cookies" element={<LegalPage title="Cookie Policy" type="cookies" />} />
@@ -658,6 +1065,16 @@ function App() {
       </div>
       {!ownerRoute && <Footer />}
       {!ownerRoute && <CookieBanner />}
+      {loginPopupOpen && !sessionUser && !ownerRoute && !authRoute && (
+        <LoginSignup
+          compact
+          onDismiss={() => setLoginPopupOpen(false)}
+          onAuthenticated={() => {
+            setLoginPopupOpen(false);
+            navigate("/");
+          }}
+        />
+      )}
     </>
   );
 }

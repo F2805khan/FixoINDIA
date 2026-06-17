@@ -8,7 +8,8 @@ import {
   getUsers,
   resetUserPassword,
   replyToSupportMessage,
-  updatePaymentMethods
+  updatePaymentMethods,
+  exportAcceptedBookingsExcel
 } from "../controllers/adminController.js";
 import { cancelBooking, assignProfessional, updateBookingStatus } from "../controllers/bookingController.js";
 import {
@@ -29,6 +30,7 @@ router.post("/services", createService);
 router.put("/services/:id", updateService);
 router.delete("/services/:id", deleteService);
 router.get("/bookings", getAllBookings);
+router.get("/bookings/export-excel", exportAcceptedBookingsExcel);
 router.put("/bookings/:id/status", updateBookingStatus);
 router.put("/bookings/:id/assign", assignProfessional);
 router.put("/bookings/:id/cancel", cancelBooking);

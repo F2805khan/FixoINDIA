@@ -17,6 +17,9 @@ import { heroImage, reviews, services as defaultServices } from "../data/service
 
 function Home({ services = defaultServices, onBookService }) {
   const popularServices = services.slice(0, 5);
+  const featuredService = popularServices[0];
+  const featuredServiceId = featuredService?.bookingId || featuredService?.id || featuredService?._id;
+  const featuredServicePath = featuredServiceId ? `/book/${featuredServiceId}` : "/services";
 
   return (
     <>
@@ -57,9 +60,15 @@ function Home({ services = defaultServices, onBookService }) {
               doorstep.
             </p>
             <div className="hero-actions">
-              <button className="btn btn-primary" onClick={() => onBookService(popularServices[0])}>
-                Book a Service
-              </button>
+              {onBookService ? (
+                <button className="btn btn-primary" type="button" onClick={() => featuredService && onBookService(featuredService)} disabled={!featuredService}>
+                  Book a Service
+                </button>
+              ) : (
+                <a className="btn btn-primary" href={featuredServicePath}>
+                  Book a Service
+                </a>
+              )}
               <a className="btn btn-outline" href="#booking-guide">
                 <Clock3 size={17} /> How It Works
               </a>

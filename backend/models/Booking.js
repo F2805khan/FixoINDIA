@@ -51,6 +51,7 @@ Booking.init(
       defaultValue: "Confirmed"
     },
     professionalName: { type: DataTypes.STRING, defaultValue: "Ramesh Kumar" },
+    professionalPhone: { type: DataTypes.STRING, defaultValue: "99988877766" },
     professionalPhoto: {
       type: DataTypes.STRING,
       defaultValue:

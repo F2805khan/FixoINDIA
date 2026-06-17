@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Toaster, toast } from "react-hot-toast";
+import { toast } from "../utils/notifications.js";
 import { ArrowLeft, LayoutDashboard, ShieldCheck } from "lucide-react";
 import { api } from "../api/client.js";
+import { displayUserName } from "../data/sessionStore.js";
+import NotificationCenter from "../components/NotificationCenter.jsx";
 import AdminAccessGate from "./AdminAccessGate.jsx";
 import AdminDashboard from "./AdminDashboard.jsx";
 
@@ -75,7 +77,6 @@ function OwnerPanel() {
 
   return (
     <main className="owner-shell">
-      <Toaster position="top-right" />
       <header className="owner-topbar shell">
         <div className="owner-brand">
           <span><LayoutDashboard size={17} /></span>
@@ -85,19 +86,20 @@ function OwnerPanel() {
           </div>
         </div>
         <div className="owner-topbar-actions">
+          <NotificationCenter />
           <Link className="owner-back" to="/">
             <ArrowLeft size={16} /> Public site
           </Link>
           {session?.user ? (
             <div className="owner-session">
-              <span className="owner-role"><ShieldCheck size={14} /> {session.user.role === "owner" ? "Owner" : "Admin"}</span>
-              <strong>{session.user.name || session.user.userId}</strong>
+              <span className="owner-role"><ShieldCheck size={14} /> {session.user.role === "owner" ? "Owner" : "Operations"}</span>
+              <strong>{displayUserName(session.user)}</strong>
               <button type="button" className="btn btn-ghost btn-small" onClick={handleLogout}>
                 Logout
               </button>
             </div>
           ) : (
-            <span className="owner-locked">Admin access only</span>
+            <span className="owner-locked">Operations access only</span>
           )}
         </div>
       </header>

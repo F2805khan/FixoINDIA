@@ -15,13 +15,18 @@ SupportMessage.init(
       allowNull: true,
       references: { model: "users", key: "_id" }
     },
+    ticketId: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      unique: true
+    },
     name: { type: DataTypes.STRING, allowNull: false },
     email: { type: DataTypes.STRING, allowNull: false },
     message: { type: DataTypes.TEXT, allowNull: false },
     reply: { type: DataTypes.TEXT, allowNull: true, defaultValue: "" },
     status: {
-      type: DataTypes.ENUM("Open", "Replied", "Closed"),
-      defaultValue: "Open"
+      type: DataTypes.ENUM("Pending", "Open", "Replied", "Complete", "Closed"),
+      defaultValue: "Pending"
     }
   },
   {

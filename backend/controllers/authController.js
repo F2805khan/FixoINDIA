@@ -385,7 +385,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
 });
 
 export const verifyOtp = asyncHandler(async (req, res) => {
-  const { name, email, phone, userId, identifier, otp, address, password, purpose = "login" } = req.body;
+  const { name, email, phone, userId, identifier, otp, address, purpose = "login" } = req.body;
   const identityWhere = buildIdentityWhere({ email, phone, userId, identifier });
   const existingUser = identityWhere ? await User.findOne({ where: identityWhere }) : null;
   const key = getOtpStoreKey({ user: existingUser, email, identifier });
@@ -410,12 +410,9 @@ export const verifyOtp = asyncHandler(async (req, res) => {
     throw new Error("Account not found");
   }
 
-  if (
-    purpose === "signup" &&
-    (!name?.trim() || !email?.trim() || !phone?.trim() || !password || String(password).length < 6)
-  ) {
+  if (purpose === "signup" && !email?.trim()) {
     res.status(400);
-    throw new Error("Name, email, phone, and password (min 6 characters) are required for signup");
+    throw new Error("Email is required for OTP signup");
   }
 
   const stored = otpStore.get(key);
@@ -433,12 +430,11 @@ export const verifyOtp = asyncHandler(async (req, res) => {
   const isSignup = !user;
   if (!user) {
     user = await User.create({
-      name: name || "FunService Customer",
+      name: name || email?.split("@")[0] || "FunService Customer",
       email,
-      phone,
+      phone: phone || null,
       userId: userId?.trim() ? userId.trim().toLowerCase() : undefined,
       address,
-      password,
       authProvider: "otp"
     });
   } else {

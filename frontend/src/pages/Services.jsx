@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Brush,
   Bug,
@@ -16,58 +17,75 @@ import {
 } from "lucide-react";
 import ServiceCard from "../components/ServiceCard.jsx";
 import { categories, services as defaultServices } from "../data/services.js";
+import { matchServiceQuery } from "../utils/serviceSearch.js";
 
 const categoryIcons = {
   "All Services": Sparkles,
-  "AC Repairing": Snowflake,
-  Electrician: PlugZap,
-  Cleaning: SprayCan,
   "Salon at Home": Brush,
-  Plumbing: ShowerHead,
+  "Spa at Home": Sparkles,
+  "AC Repairing": Snowflake,
   "Appliance Repair": WashingMachine,
-  Carpentry: Hammer,
-  Painting: PaintRoller,
+  Cleaning: SprayCan,
   "Pest Control": Bug,
-  Laundry: WashingMachine,
-  "More Services": Wrench
+  Electrician: PlugZap,
+  Plumbing: ShowerHead,
+  Carpentry: Hammer,
+  Painting: PaintRoller
 };
 
-function Services({ services = defaultServices, onBookService }) {
+function Services({ services = defaultServices, searchableServices = services, onBookService }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeCategory, setActiveCategory] = useState("All Services");
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(searchParams.get("q") || "");
+
+  useEffect(() => {
+    setSearch(searchParams.get("q") || "");
+  }, [searchParams]);
 
   const categoryList = useMemo(() => {
     const serviceCategories = services.map((service) => service.category).filter(Boolean);
     return Array.from(new Set([...categories, ...serviceCategories]));
   }, [services]);
 
+  const servicePool = search.trim() ? searchableServices : services;
+
   const filteredServices = useMemo(() => {
-    return services.filter((service) => {
+    return servicePool.filter((service) => {
       const categoryMatch =
-        activeCategory === "All Services" ||
-        activeCategory === "More Services" ||
-        service.category === activeCategory;
-      const searchMatch = service.title.toLowerCase().includes(search.toLowerCase());
-      return categoryMatch && searchMatch;
+        activeCategory === "All Services" || service.category === activeCategory;
+      return categoryMatch && matchServiceQuery(service, search);
     });
-  }, [activeCategory, search]);
+  }, [activeCategory, search, servicePool]);
 
   return (
     <section className="page-shell">
       <div className="container">
-        <div className="page-head with-search">
+        <div className="page-title-row">
           <div>
             <h1>Our Services</h1>
             <p>Choose from a wide range of services and get it done in under 30 minutes.</p>
           </div>
-          <label className="search-box">
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search for a service..."
-            />
-            <Search size={18} />
-          </label>
+          <form
+            className="services-search-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const next = new URLSearchParams(searchParams);
+              const query = search.trim();
+              if (query) next.set("q", query);
+              else next.delete("q");
+              setSearchParams(next, { replace: true });
+            }}
+          >
+            <label className="search-box">
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search for a service..."
+                aria-label="Search for a service"
+              />
+              <Search size={18} />
+            </label>
+          </form>
         </div>
 
         <div className="services-layout">
@@ -88,13 +106,20 @@ function Services({ services = defaultServices, onBookService }) {
           </aside>
 
           <div className="service-grid">
-            {filteredServices.map((service) => (
-              <ServiceCard
-                key={service.id || service._id}
-                service={service}
-                onBookService={onBookService}
-              />
-            ))}
+            {filteredServices.length ? (
+              filteredServices.map((service) => (
+                <ServiceCard
+                  key={service.id || service._id}
+                  service={service}
+                  onBookService={onBookService}
+                />
+              ))
+            ) : (
+              <div className="services-empty-search">
+                <h3>No services found for "{search}"</h3>
+                <p>Try another keyword like cleaning, AC, electrician, or plumbing.</p>
+              </div>
+            )}
           </div>
         </div>
 

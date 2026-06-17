@@ -52,7 +52,7 @@ export const createOrder = asyncHandler(async (req, res) => {
 });
 
 export const getAvailablePaymentMethods = asyncHandler(async (req, res) => {
-  res.json(await getPaymentMethodSettings({ enabledOnly: true }));
+  res.json(await getPaymentMethodSettings({ enabledOnly: false }));
 });
 
 export const verifyPayment = asyncHandler(async (req, res) => {

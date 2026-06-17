@@ -1,7 +1,11 @@
 const API_URL = import.meta.env.VITE_API_URL || "/api";
 const API_ORIGIN = API_URL.replace(/\/api\/?$/, "");
-const TOKEN_KEY = "quickfix_token";
-const USER_KEY = "quickfix_user";
+const TOKEN_KEY = "funservice_token";
+const USER_KEY = "funservice_user";
+const legacyBrandPrefix = ["quick", "fix"].join("");
+const LEGACY_TOKEN_KEY = `${legacyBrandPrefix}_token`;
+const LEGACY_USER_KEY = `${legacyBrandPrefix}_user`;
+const SESSION_CHANGED_EVENT = "funservice:session-changed";
 
 const bookingPath = (id) => `/bookings/${encodeURIComponent(id)}`;
 const paymentPath = (bookingId) => `/payment/${encodeURIComponent(bookingId)}`;
@@ -12,7 +16,7 @@ const adminSupportPath = (id) => `/admin/support/${encodeURIComponent(id)}/reply
 const adminUserPasswordPath = (id) => `/admin/users/${encodeURIComponent(id)}/password`;
 
 async function request(path, options = {}) {
-  const token = localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY);
   const optionHeaders = options.headers || {};
   const response = await fetch(`${API_URL}${path}`, {
     ...options,
@@ -37,7 +41,7 @@ async function request(path, options = {}) {
 
 const readSavedUser = () => {
   try {
-    const saved = localStorage.getItem(USER_KEY);
+    const saved = localStorage.getItem(USER_KEY) || localStorage.getItem(LEGACY_USER_KEY);
     return saved ? JSON.parse(saved) : null;
   } catch {
     return null;
@@ -47,13 +51,17 @@ const readSavedUser = () => {
 const saveSession = ({ token, user }) => {
   if (token) localStorage.setItem(TOKEN_KEY, token);
   if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-  window.dispatchEvent(new Event("quickfix:session-changed"));
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+  localStorage.removeItem(LEGACY_USER_KEY);
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 };
 
 const clearSession = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
-  window.dispatchEvent(new Event("quickfix:session-changed"));
+  localStorage.removeItem(LEGACY_TOKEN_KEY);
+  localStorage.removeItem(LEGACY_USER_KEY);
+  window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 };
 
 const notifyServicesChanged = () => {
@@ -62,8 +70,8 @@ const notifyServicesChanged = () => {
 };
 
 export const api = {
-  hasToken: () => Boolean(localStorage.getItem(TOKEN_KEY)),
-  getToken: () => localStorage.getItem(TOKEN_KEY),
+  hasToken: () => Boolean(localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY)),
+  getToken: () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY),
   getSavedUser: readSavedUser,
   saveSession,
   clearSession,

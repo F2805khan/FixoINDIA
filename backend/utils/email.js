@@ -228,25 +228,41 @@ export const sendReviewNotificationEmail = ({
   });
 };
 
-export const sendSupportNotificationEmail = ({ name, email, message }) => {
+export const sendSupportNotificationEmail = ({
+  ticketId,
+  name,
+  email,
+  message,
+  userId,
+  backendUserId,
+  createdAt = new Date()
+}) => {
   const supportTo = process.env.RESEND_SUPPORT_TO?.trim();
   if (!supportTo) return false;
 
+  const rows = [
+    ["Ticket ID", ticketId],
+    ["User ID", userId],
+    ["Backend User UUID", backendUserId],
+    ["Customer", name],
+    ["Email", email],
+    ["Submitted at", formatDateTime(createdAt)]
+  ];
   const content = renderEmail({
-    preheader: `New support message from ${name}`,
-    heading: "New support message",
+    preheader: `New support ticket ${ticketId || ""} from ${name}`,
+    heading: "New support ticket",
     bodyHtml: `
-      <p style="margin:0 0 12px;"><strong>From:</strong> ${escapeHtml(name)} (${escapeHtml(email)})</p>
+      <table style="width:100%; border-collapse:collapse; font-size:14px; margin:0 0 16px;">${renderRows(rows)}</table>
       <p style="margin:0 0 8px;"><strong>Message:</strong></p>
       <p style="margin:0; line-height:1.6;">${escapeHtml(message).replaceAll("\n", "<br />")}</p>
     `,
-    bodyText: `From: ${name} (${email})\n\nMessage:\n${message}`
+    bodyText: `${renderTextRows(rows)}\n\nMessage:\n${message}`
   });
 
   return sendEmail({
     to: supportTo,
     replyTo: email,
-    subject: `New FunService support message from ${cleanSubjectPart(name)}`,
+    subject: `${ticketId ? `[${cleanSubjectPart(ticketId)}] ` : ""}New FunService support ticket from ${cleanSubjectPart(name)}`,
     ...content
   });
 };

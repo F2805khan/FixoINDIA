@@ -29,7 +29,7 @@ const ensureAdminUser = async () => {
 
   if (!admin) {
     admin = await User.create({
-      name: normalize(process.env.ADMIN_NAME) || "FunService Admin",
+      name: normalize(process.env.ADMIN_NAME) || "FunService Control",
       userId: adminUserId,
       email: adminEmail,
       phone: adminPhone,
@@ -40,6 +40,10 @@ const ensureAdminUser = async () => {
   } else {
     admin.role = "owner";
     admin.authProvider = "password";
+    const preferredName = normalize(process.env.ADMIN_NAME) || "FunService Control";
+    if (!admin.name || admin.name.toLowerCase() === "quickfix admin") {
+      admin.name = preferredName;
+    }
     if (adminUserId && admin.userId !== adminUserId) admin.userId = adminUserId;
     if (adminEmail && admin.email !== adminEmail) admin.email = adminEmail;
     if (adminPhone && admin.phone !== adminPhone) admin.phone = adminPhone;

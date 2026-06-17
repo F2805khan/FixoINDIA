@@ -7,9 +7,20 @@ import SupportMessage from "../models/SupportMessage.js";
 import User from "../models/User.js";
 import { sendSupportReplyEmail } from "../utils/email.js";
 import { getPaymentMethodSettings, updatePaymentMethodSettings } from "../utils/paymentMethods.js";
+import { updateAcceptedBookingsCSV } from "../utils/excelExporter.js";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+
+const customerAttributes = ["_id", "userId", "name", "email", "phone", "address", "city", "latitude", "longitude"];
 
 const mapBookingWithUser = (b) => {
   const plain = b.get({ plain: true });
+  const customer = plain.customer || null;
+  plain.customerProfile = customer;
   plain.userId = plain.customer || plain.userId;
   delete plain.customer;
   delete plain.service;
@@ -48,7 +59,7 @@ export const getOverview = asyncHandler(async (req, res) => {
 
   const [bookings, users, serviceCount, paymentCount] = await Promise.all([
     Booking.findAll({
-      include: [{ model: User, as: "customer", attributes: ["_id", "name", "email", "phone"] }],
+      include: [{ model: User, as: "customer", attributes: customerAttributes }],
       order: [["createdAt", "DESC"]]
     }),
     User.findAll({
@@ -178,7 +189,7 @@ export const resetUserPassword = asyncHandler(async (req, res) => {
 
 export const getAllBookings = asyncHandler(async (req, res) => {
   const bookings = await Booking.findAll({
-    include: [{ model: User, as: "customer", attributes: ["_id", "name", "email", "phone"] }],
+    include: [{ model: User, as: "customer", attributes: customerAttributes }],
     order: [["createdAt", "DESC"]]
   });
   res.json(bookings.map(mapBookingWithUser));
@@ -206,7 +217,7 @@ export const updatePaymentMethods = asyncHandler(async (req, res) => {
 
 export const getSupportInbox = asyncHandler(async (req, res) => {
   const messages = await SupportMessage.findAll({
-    include: [{ model: User, as: "customer", attributes: ["_id", "name", "email", "phone"] }],
+    include: [{ model: User, as: "customer", attributes: ["_id", "userId", "name", "email", "phone"] }],
     order: [["createdAt", "DESC"]]
   });
   res.json(messages.map(mapSupportWithUser));
@@ -239,3 +250,10 @@ export const replyToSupportMessage = asyncHandler(async (req, res) => {
 
   res.json({ ...message.toJSON(), emailReplySent });
 });
+
+export const exportAcceptedBookingsExcel = asyncHandler(async (req, res) => {
+  await updateAcceptedBookingsCSV();
+  const filePath = path.join(__dirname, "../data/accepted_bookings.csv");
+  res.download(filePath, "accepted_bookings.csv");
+});
+
