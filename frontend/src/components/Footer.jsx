@@ -1,4 +1,4 @@
-import { AppWindow, Facebook, Instagram, Linkedin, Play, Twitter, Zap } from "lucide-react";
+import { AppWindow, Facebook, Instagram, Linkedin, Play, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
 
 function Footer() {
@@ -8,7 +8,7 @@ function Footer() {
         <div className="footer-brand">
           <Link to="/" className="brand">
             <span className="brand-icon">
-              <Zap size={20} fill="currentColor" />
+              <img src="/images/site/funservice-logo.svg" alt="" />
             </span>
             <span>
               <strong>FunService</strong>

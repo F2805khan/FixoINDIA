@@ -13,6 +13,11 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const defaultBookingsSheetCsvUrl =
+  "https://docs.google.com/spreadsheets/d/1N1FV_XGYcN1St4ZHK4sZj-rpibYI69M9i7tZx_B3WF0/export?format=csv";
+
+const getBookingsSheetCsvUrl = () =>
+  (process.env.GOOGLE_BOOKINGS_SHEET_CSV_URL || defaultBookingsSheetCsvUrl).trim();
 
 
 const customerAttributes = ["_id", "userId", "name", "email", "phone", "address", "city", "latitude", "longitude"];
@@ -252,8 +257,26 @@ export const replyToSupportMessage = asyncHandler(async (req, res) => {
 });
 
 export const exportAcceptedBookingsExcel = asyncHandler(async (req, res) => {
+  const sheetCsvUrl = getBookingsSheetCsvUrl();
+
+  if (sheetCsvUrl && typeof fetch === "function") {
+    try {
+      const sheetResponse = await fetch(sheetCsvUrl);
+      if (!sheetResponse.ok) {
+        throw new Error(`Google Sheet export returned ${sheetResponse.status}`);
+      }
+
+      const csv = await sheetResponse.text();
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="accepted_bookings.csv"');
+      res.send(csv);
+      return;
+    } catch (error) {
+      console.error("Google Sheet export failed, falling back to local CSV:", error.message);
+    }
+  }
+
   await updateAcceptedBookingsCSV();
   const filePath = path.join(__dirname, "../data/accepted_bookings.csv");
   res.download(filePath, "accepted_bookings.csv");
 });
-

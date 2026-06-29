@@ -10,8 +10,7 @@ import {
   ShieldCheck,
   UserRound,
   Wrench,
-  X,
-  Zap
+  X
 } from "lucide-react";
 
 const baseLinks = [
@@ -39,7 +38,7 @@ function Navbar({ user, onLogout }) {
       <nav className="navbar container">
         <Link to="/" className="brand" onClick={closeMenus}>
           <span className="brand-icon">
-            <Zap size={20} fill="currentColor" />
+            <img src="/images/site/funservice-logo.svg" alt="" />
           </span>
           <span>
             <strong>FunService</strong>

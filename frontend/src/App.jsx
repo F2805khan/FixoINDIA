@@ -224,7 +224,7 @@ const checklistGroups = [
 ];
 
 function Logo() {
-  return <Link className="brand" to="/"><span className="brand-mark">FS</span><span>FunService</span></Link>;
+  return <Link className="brand" to="/"><span className="brand-mark"><img src="/images/site/funservice-logo.svg" alt="" /></span><span>FunService</span></Link>;
 }
 
 function Navbar({ cartCount = 0 }) {
