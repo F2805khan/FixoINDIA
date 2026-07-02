@@ -1,4 +1,5 @@
 import AuthEvent from "./AuthEvent.js";
+import BeautyArtist from "./BeautyArtist.js";
 import Booking from "./Booking.js";
 import Payment from "./Payment.js";
 import PaymentMethodSetting from "./PaymentMethodSetting.js";
@@ -16,4 +17,4 @@ User.hasMany(AuthEvent, { foreignKey: "userId" });
 User.hasMany(Booking, { foreignKey: "userId" });
 User.hasMany(SupportMessage, { foreignKey: "userId" });
 
-export { AuthEvent, Booking, Payment, PaymentMethodSetting, Service, SupportMessage, User };
+export { AuthEvent, BeautyArtist, Booking, Payment, PaymentMethodSetting, Service, SupportMessage, User };

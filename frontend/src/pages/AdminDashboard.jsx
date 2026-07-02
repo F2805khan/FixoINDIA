@@ -12,6 +12,7 @@ import {
   Copy,
   CreditCard,
   Edit3,
+  Film,
   MapPin,
   MessageCircle,
   Phone,
@@ -34,7 +35,12 @@ import {
   Mail,
   UserCheck,
   KeyRound,
-  Reply
+  Reply,
+  Scissors,
+  Sparkles,
+  Star,
+  Upload,
+  Video
 } from "lucide-react";
 import { api } from "../api/client.js";
 import { categories } from "../data/services.js";
@@ -48,6 +54,39 @@ const blankService = {
   description: "",
   region: "All Regions",
   enabled: true
+};
+
+const blankBeautyArtist = {
+  name: "",
+  specialty: "Beauty Artist",
+  salonName: "",
+  region: "All Regions",
+  phone: "",
+  email: "",
+  image: "/images/site/expert-riya.jpg",
+  bio: "",
+  rating: "4.8",
+  enabled: true,
+  services: [],
+  videoTitle: "",
+  videoUrl: "",
+  videoThumbnail: ""
+};
+
+const blankBeautyService = {
+  title: "",
+  price: "",
+  duration: "60 mins",
+  image: "/images/site/beauty-salon.jpg",
+  description: "",
+  enabled: true
+};
+
+const blankBeautyVideo = {
+  artistId: "",
+  videoTitle: "",
+  videoUrl: "",
+  videoThumbnail: ""
 };
 
 const regions = ["All Regions", "Bengaluru", "Delhi NCR", "Mumbai", "Hyderabad", "Pune", "Chennai"];
@@ -93,6 +132,10 @@ const formatDate = (value) => {
 };
 
 const getBookingKey = (booking) => String(booking?._id || booking?.bookingId || "");
+
+const getBeautyArtistId = (artist) => String(artist?._id || artist?.id || "");
+
+const getBeautyServices = (artist) => (Array.isArray(artist?.services) ? artist.services : []);
 
 const getBookingCustomer = (booking) => {
   if (booking?.customerProfile) return booking.customerProfile;
@@ -146,7 +189,7 @@ const buildAgentBookingMessage = (booking) => {
 };
 
 function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdated, onServiceDeleted, onServicesSynced }) {
-  const [activeTab, setActiveTab] = useState("overview"); // overview, bookings, services, users, support, settings
+  const [activeTab, setActiveTab] = useState("overview");
   const [form, setForm] = useState(blankService);
   const [showForm, setShowForm] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState(null);
@@ -176,6 +219,17 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
   const [assigningId, setAssigningId] = useState(null);
   const [updatingStatusId, setUpdatingStatusId] = useState(null);
   const [supportReplies, setSupportReplies] = useState({});
+  const [beautyArtists, setBeautyArtists] = useState([]);
+  const [beautyArtistForm, setBeautyArtistForm] = useState(blankBeautyArtist);
+  const [beautyServiceForm, setBeautyServiceForm] = useState(blankBeautyService);
+  const [beautyVideoForm, setBeautyVideoForm] = useState(blankBeautyVideo);
+  const [showBeautyArtistForm, setShowBeautyArtistForm] = useState(false);
+  const [editingBeautyArtistId, setEditingBeautyArtistId] = useState(null);
+  const [beautyServiceArtistId, setBeautyServiceArtistId] = useState("");
+  const [beautySearch, setBeautySearch] = useState("");
+  const [beautySaving, setBeautySaving] = useState(false);
+  const [beautyDeletingId, setBeautyDeletingId] = useState(null);
+  const [beautyUpdatingId, setBeautyUpdatingId] = useState(null);
 
   const daily = overview.daily?.length ? overview.daily : emptyOverview.daily;
   const totals = overview.totals || emptyOverview.totals;
@@ -186,6 +240,9 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
   }));
   const visibleServices = managedServices.filter((service) => regionFilter === "All Regions" || service.region === "All Regions" || service.region === regionFilter);
   const activeServiceCount = managedServices.filter((service) => service.enabled !== false).length;
+  const activeBeautyArtistCount = beautyArtists.filter((artist) => artist.enabled !== false).length;
+  const beautyServiceCount = beautyArtists.reduce((total, artist) => total + getBeautyServices(artist).length, 0);
+  const beautyVideoCount = beautyArtists.filter((artist) => artist.videoUrl).length;
 
   const maxChartValue = useMemo(() => {
     const values = daily.flatMap((day) => [day.orders || 0, day.activeUsers || 0]);
@@ -200,6 +257,24 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
   const openSupportCount = useMemo(() => {
     return supportList.filter((s) => s.status === "Open" || s.status === "Pending").length;
   }, [supportList]);
+
+  const filteredBeautyArtists = useMemo(() => {
+    const query = beautySearch.trim().toLowerCase();
+    if (!query) return beautyArtists;
+
+    return beautyArtists.filter((artist) => {
+      const serviceTitles = getBeautyServices(artist).map((service) => service.title).join(" ");
+      const haystack = [
+        artist.name,
+        artist.specialty,
+        artist.salonName,
+        artist.region,
+        serviceTitles
+      ].join(" ").toLowerCase();
+
+      return haystack.includes(query);
+    });
+  }, [beautyArtists, beautySearch]);
 
   const stats = [
     {
@@ -289,6 +364,15 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     }
   };
 
+  const loadBeautyArtists = async () => {
+    try {
+      const data = await api.getAdminBeautyArtists();
+      setBeautyArtists(data || []);
+    } catch (err) {
+      console.error("Failed to load beauty artists:", err);
+    }
+  };
+
   const refreshDashboard = async ({ quiet = false } = {}) => {
     if (!quiet) setRefreshing(true);
     try {
@@ -298,7 +382,8 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
         loadPaymentMethods(),
         loadBookingsList(),
         loadUsersList(),
-        loadSupportList()
+        loadSupportList(),
+        loadBeautyArtists()
       ]);
       if (!quiet) toast.success("Backend dashboard refreshed.");
     } catch (error) {
@@ -573,6 +658,233 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     }
   };
 
+  const updateBeautyArtistForm = (event) => {
+    const { name, type, checked, value } = event.target;
+    setBeautyArtistForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const updateBeautyServiceForm = (event) => {
+    const { name, type, checked, value } = event.target;
+    setBeautyServiceForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const updateBeautyVideoForm = (event) => {
+    const { name, value } = event.target;
+    setBeautyVideoForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const resetBeautyArtistForm = () => {
+    setBeautyArtistForm(blankBeautyArtist);
+    setEditingBeautyArtistId(null);
+    setShowBeautyArtistForm(false);
+  };
+
+  const openNewBeautyArtistForm = () => {
+    setBeautyArtistForm(blankBeautyArtist);
+    setEditingBeautyArtistId(null);
+    setShowBeautyArtistForm(true);
+  };
+
+  const mergeBeautyArtist = (savedArtist) => {
+    setBeautyArtists((current) => {
+      const savedId = getBeautyArtistId(savedArtist);
+      const exists = current.some((artist) => getBeautyArtistId(artist) === savedId);
+      return exists
+        ? current.map((artist) => (getBeautyArtistId(artist) === savedId ? savedArtist : artist))
+        : [savedArtist, ...current];
+    });
+  };
+
+  const startEditBeautyArtist = (artist) => {
+    setBeautyArtistForm({
+      ...blankBeautyArtist,
+      ...artist,
+      services: getBeautyServices(artist),
+      rating: artist.rating ?? "4.8",
+      enabled: artist.enabled !== false
+    });
+    setEditingBeautyArtistId(getBeautyArtistId(artist));
+    setShowBeautyArtistForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const submitBeautyArtist = async (event) => {
+    event.preventDefault();
+    const rating = Number(beautyArtistForm.rating);
+    const payload = {
+      ...beautyArtistForm,
+      name: String(beautyArtistForm.name || "").trim(),
+      specialty: String(beautyArtistForm.specialty || "").trim() || "Beauty Artist",
+      salonName: String(beautyArtistForm.salonName || "").trim(),
+      region: beautyArtistForm.region || "All Regions",
+      phone: String(beautyArtistForm.phone || "").trim(),
+      email: String(beautyArtistForm.email || "").trim(),
+      image: String(beautyArtistForm.image || "").trim() || "/images/site/expert-riya.jpg",
+      bio: String(beautyArtistForm.bio || "").trim(),
+      rating,
+      enabled: beautyArtistForm.enabled !== false,
+      services: getBeautyServices(beautyArtistForm)
+    };
+
+    if (!payload.name || !Number.isFinite(rating)) {
+      toast.error("Artist name and rating are required.");
+      return;
+    }
+
+    setBeautySaving(true);
+    try {
+      const savedArtist = editingBeautyArtistId
+        ? await api.updateBeautyArtist(editingBeautyArtistId, payload)
+        : await api.createBeautyArtist(payload);
+      mergeBeautyArtist(savedArtist);
+      if (!beautyServiceArtistId) setBeautyServiceArtistId(getBeautyArtistId(savedArtist));
+      toast.success(editingBeautyArtistId ? "Beauty artist updated." : "Beauty artist added.");
+      resetBeautyArtistForm();
+    } catch (error) {
+      toast.error(error.message || "Failed to save beauty artist.");
+    } finally {
+      setBeautySaving(false);
+    }
+  };
+
+  const toggleBeautyArtistStatus = async (artist) => {
+    const artistId = getBeautyArtistId(artist);
+    setBeautyUpdatingId(artistId);
+    try {
+      const savedArtist = await api.updateBeautyArtist(artistId, { enabled: artist.enabled === false });
+      mergeBeautyArtist(savedArtist);
+      toast.success(`${artist.name} ${savedArtist.enabled ? "enabled" : "disabled"}.`);
+    } catch (error) {
+      toast.error(error.message || "Failed to update beauty artist.");
+    } finally {
+      setBeautyUpdatingId(null);
+    }
+  };
+
+  const deleteBeautyArtist = async (artist) => {
+    const artistId = getBeautyArtistId(artist);
+    if (!window.confirm(`Are you sure you want to delete ${artist.name}?`)) return;
+    setBeautyDeletingId(artistId);
+    try {
+      await api.deleteBeautyArtist(artistId);
+      setBeautyArtists((current) => current.filter((item) => getBeautyArtistId(item) !== artistId));
+      if (beautyServiceArtistId === artistId) setBeautyServiceArtistId("");
+      if (beautyVideoForm.artistId === artistId) setBeautyVideoForm(blankBeautyVideo);
+      toast.success("Beauty artist deleted.");
+    } catch (error) {
+      toast.error(error.message || "Failed to delete beauty artist.");
+    } finally {
+      setBeautyDeletingId(null);
+    }
+  };
+
+  const submitBeautyService = async (event) => {
+    event.preventDefault();
+    const artist = beautyArtists.find((item) => getBeautyArtistId(item) === beautyServiceArtistId);
+    const price = Number(beautyServiceForm.price);
+
+    if (!artist) {
+      toast.error("Choose a beauty artist first.");
+      return;
+    }
+
+    if (!String(beautyServiceForm.title || "").trim() || !Number.isFinite(price) || price < 0) {
+      toast.error("Beauty service name and price are required.");
+      return;
+    }
+
+    const service = {
+      id: `${slugify(beautyServiceForm.title)}-${Date.now().toString(36)}`,
+      title: String(beautyServiceForm.title || "").trim(),
+      description: String(beautyServiceForm.description || "").trim(),
+      price,
+      duration: String(beautyServiceForm.duration || "").trim() || "60 mins",
+      image: String(beautyServiceForm.image || "").trim() || "/images/site/beauty-salon.jpg",
+      enabled: beautyServiceForm.enabled !== false
+    };
+
+    setBeautySaving(true);
+    try {
+      const savedArtist = await api.updateBeautyArtist(getBeautyArtistId(artist), {
+        services: [...getBeautyServices(artist), service]
+      });
+      mergeBeautyArtist(savedArtist);
+      setBeautyServiceForm(blankBeautyService);
+      toast.success("Beauty service added to artist.");
+    } catch (error) {
+      toast.error(error.message || "Failed to add beauty service.");
+    } finally {
+      setBeautySaving(false);
+    }
+  };
+
+  const updateBeautyServiceList = async (artist, services, successMessage) => {
+    const artistId = getBeautyArtistId(artist);
+    setBeautyUpdatingId(artistId);
+    try {
+      const savedArtist = await api.updateBeautyArtist(artistId, { services });
+      mergeBeautyArtist(savedArtist);
+      toast.success(successMessage);
+    } catch (error) {
+      toast.error(error.message || "Failed to update beauty services.");
+    } finally {
+      setBeautyUpdatingId(null);
+    }
+  };
+
+  const toggleBeautyServiceStatus = (artist, serviceKey) => {
+    const nextServices = getBeautyServices(artist).map((service, index) => {
+      const key = service.id || String(index);
+      return key === serviceKey ? { ...service, enabled: service.enabled === false } : service;
+    });
+    updateBeautyServiceList(artist, nextServices, "Beauty service status updated.");
+  };
+
+  const deleteBeautyService = (artist, serviceKey) => {
+    const nextServices = getBeautyServices(artist).filter((service, index) => (service.id || String(index)) !== serviceKey);
+    updateBeautyServiceList(artist, nextServices, "Beauty service removed.");
+  };
+
+  const loadBeautyVideoForm = (artist) => {
+    setBeautyVideoForm({
+      artistId: getBeautyArtistId(artist),
+      videoTitle: artist.videoTitle || "",
+      videoUrl: artist.videoUrl || "",
+      videoThumbnail: artist.videoThumbnail || ""
+    });
+  };
+
+  const submitBeautyVideo = async (event) => {
+    event.preventDefault();
+    const artist = beautyArtists.find((item) => getBeautyArtistId(item) === beautyVideoForm.artistId);
+
+    if (!artist) {
+      toast.error("Choose a beauty artist first.");
+      return;
+    }
+
+    if (!String(beautyVideoForm.videoUrl || "").trim()) {
+      toast.error("Artist video URL is required.");
+      return;
+    }
+
+    setBeautySaving(true);
+    try {
+      const savedArtist = await api.updateBeautyArtist(getBeautyArtistId(artist), {
+        videoTitle: String(beautyVideoForm.videoTitle || "").trim() || "Artist preview",
+        videoUrl: String(beautyVideoForm.videoUrl || "").trim(),
+        videoThumbnail: String(beautyVideoForm.videoThumbnail || "").trim()
+      });
+      mergeBeautyArtist(savedArtist);
+      setBeautyVideoForm({ ...blankBeautyVideo, artistId: getBeautyArtistId(savedArtist) });
+      toast.success("Artist video saved.");
+    } catch (error) {
+      toast.error(error.message || "Failed to save artist video.");
+    } finally {
+      setBeautySaving(false);
+    }
+  };
+
   // Filters for Booking list
   const filteredBookings = useMemo(() => {
     return bookingsList.filter((b) => {
@@ -614,6 +926,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     overview: "Dashboard Overview",
     bookings: "Bookings Management",
     services: "Service Catalog Manager",
+    beauty: "Beauty Artist Studio",
     users: "Users Directory",
     support: "Support Inbox",
     settings: "Settings"
@@ -623,6 +936,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     overview: "Real-time statistics, active user analytics, and market demand forecasts.",
     bookings: "Track orders, assign service professionals, and export CSV lists to Excel.",
     services: "Create, update, toggle availability, or delete services across regions.",
+    beauty: "Add beauty artists, assign beauty services, and save artist video uploads.",
     users: "Full list of user profiles, address coordinates, and account management tools.",
     support: "Read customer support queries, view ticket IDs, and send email replies.",
     settings: "Configure active payment gateways and options visible in customer checkout."
@@ -1071,6 +1385,338 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     </div>
   );
 
+  const renderBeauty = () => {
+    const selectedVideoArtist = beautyArtists.find((artist) => getBeautyArtistId(artist) === beautyVideoForm.artistId);
+
+    return (
+      <div className="admin-beauty-tab animated-fade-in">
+        <div className="beauty-admin-summary">
+          <article>
+            <Sparkles size={19} />
+            <span>Beauty Artists</span>
+            <strong>{beautyArtists.length}</strong>
+            <small>{activeBeautyArtistCount} active</small>
+          </article>
+          <article>
+            <Scissors size={19} />
+            <span>Beauty Services</span>
+            <strong>{beautyServiceCount}</strong>
+            <small>assigned to artists</small>
+          </article>
+          <article>
+            <Film size={19} />
+            <span>Artist Videos</span>
+            <strong>{beautyVideoCount}</strong>
+            <small>uploaded links</small>
+          </article>
+        </div>
+
+        {showBeautyArtistForm && (
+          <form className="admin-form beauty-artist-form" onSubmit={submitBeautyArtist}>
+            <div className="section-heading inline">
+              <div>
+                <h2>{editingBeautyArtistId ? "Edit Beauty Artist" : "Add Beauty Artist"}</h2>
+                <p>{editingBeautyArtistId ? "Profile details and availability." : "Beauty profile details."}</p>
+              </div>
+              <button className="btn btn-soft compact" type="button" onClick={resetBeautyArtistForm}>
+                Cancel
+              </button>
+            </div>
+
+            <div className="admin-form-grid">
+              <label>
+                Artist Name
+                <input name="name" value={beautyArtistForm.name} onChange={updateBeautyArtistForm} placeholder="Riya Sharma" required />
+              </label>
+              <label>
+                Specialty
+                <input name="specialty" value={beautyArtistForm.specialty} onChange={updateBeautyArtistForm} placeholder="Hair, makeup, facial" required />
+              </label>
+              <label>
+                Salon / Studio
+                <input name="salonName" value={beautyArtistForm.salonName} onChange={updateBeautyArtistForm} placeholder="Glow Studio" />
+              </label>
+              <label>
+                Region
+                <select name="region" value={beautyArtistForm.region} onChange={updateBeautyArtistForm} required>
+                  {regions.map((region) => (
+                    <option value={region} key={region}>
+                      {region}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Phone
+                <input name="phone" value={beautyArtistForm.phone} onChange={updateBeautyArtistForm} placeholder="99988877766" />
+              </label>
+              <label>
+                Email
+                <input name="email" type="email" value={beautyArtistForm.email} onChange={updateBeautyArtistForm} placeholder="artist@example.com" />
+              </label>
+              <label>
+                Rating
+                <input name="rating" type="number" step="0.1" min="0" max="5" value={beautyArtistForm.rating} onChange={updateBeautyArtistForm} required />
+              </label>
+              <label className="admin-toggle-field">
+                Artist status
+                <span>
+                  <input name="enabled" type="checkbox" checked={beautyArtistForm.enabled} onChange={updateBeautyArtistForm} />
+                  {beautyArtistForm.enabled ? "On - visible" : "Off - hidden"}
+                </span>
+              </label>
+            </div>
+
+            <label>
+              Artist Photo URL
+              <input name="image" value={beautyArtistForm.image} onChange={updateBeautyArtistForm} placeholder="/images/site/expert-riya.jpg" />
+            </label>
+
+            <label>
+              Bio
+              <textarea name="bio" value={beautyArtistForm.bio} onChange={updateBeautyArtistForm} rows="3" placeholder="Soft glam, facials, grooming, and at-home beauty care." />
+            </label>
+
+            <button className="btn btn-primary" type="submit" disabled={beautySaving}>
+              <Save size={17} /> {beautySaving ? "Saving" : editingBeautyArtistId ? "Update Artist" : "Save Artist"}
+            </button>
+          </form>
+        )}
+
+        <div className="beauty-admin-toolgrid">
+          <form className="admin-form beauty-tool-panel" onSubmit={submitBeautyService}>
+            <div className="section-heading inline">
+              <div>
+                <h2>Add Beauty Service</h2>
+                <p>Artist service menu.</p>
+              </div>
+              <Scissors size={22} />
+            </div>
+
+            <div className="admin-form-grid">
+              <label>
+                Artist
+                <select value={beautyServiceArtistId} onChange={(event) => setBeautyServiceArtistId(event.target.value)} disabled={!beautyArtists.length} required>
+                  <option value="">{beautyArtists.length ? "Select artist" : "No artists yet"}</option>
+                  {beautyArtists.map((artist) => (
+                    <option value={getBeautyArtistId(artist)} key={getBeautyArtistId(artist)}>
+                      {artist.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Service Name
+                <input name="title" value={beautyServiceForm.title} onChange={updateBeautyServiceForm} placeholder="Party makeup" required />
+              </label>
+              <label>
+                Price
+                <input name="price" type="number" min="0" value={beautyServiceForm.price} onChange={updateBeautyServiceForm} placeholder="1499" required />
+              </label>
+              <label>
+                Duration
+                <input name="duration" value={beautyServiceForm.duration} onChange={updateBeautyServiceForm} required />
+              </label>
+              <label>
+                Image URL
+                <input name="image" value={beautyServiceForm.image} onChange={updateBeautyServiceForm} />
+              </label>
+              <label className="admin-toggle-field">
+                Service status
+                <span>
+                  <input name="enabled" type="checkbox" checked={beautyServiceForm.enabled} onChange={updateBeautyServiceForm} />
+                  {beautyServiceForm.enabled ? "On" : "Off"}
+                </span>
+              </label>
+            </div>
+
+            <label>
+              Description
+              <textarea name="description" value={beautyServiceForm.description} onChange={updateBeautyServiceForm} rows="3" placeholder="Skin prep, finishing, and detail-led beauty care." />
+            </label>
+
+            <button className="btn btn-primary" type="submit" disabled={beautySaving || !beautyArtists.length}>
+              <Plus size={17} /> Add Beauty Service
+            </button>
+          </form>
+
+          <form className="admin-form beauty-tool-panel" onSubmit={submitBeautyVideo}>
+            <div className="section-heading inline">
+              <div>
+                <h2>Artist Video Upload</h2>
+                <p>Featured artist media.</p>
+              </div>
+              <Upload size={22} />
+            </div>
+
+            <label>
+              Artist
+              <select name="artistId" value={beautyVideoForm.artistId} onChange={updateBeautyVideoForm} disabled={!beautyArtists.length} required>
+                <option value="">{beautyArtists.length ? "Select artist" : "No artists yet"}</option>
+                {beautyArtists.map((artist) => (
+                  <option value={getBeautyArtistId(artist)} key={getBeautyArtistId(artist)}>
+                    {artist.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="admin-form-grid">
+              <label>
+                Video Title
+                <input name="videoTitle" value={beautyVideoForm.videoTitle} onChange={updateBeautyVideoForm} placeholder="Bridal makeup preview" />
+              </label>
+              <label>
+                Video URL
+                <input name="videoUrl" value={beautyVideoForm.videoUrl} onChange={updateBeautyVideoForm} placeholder="/videos/artist-preview.mp4" required />
+              </label>
+            </div>
+
+            <label>
+              Thumbnail URL
+              <input name="videoThumbnail" value={beautyVideoForm.videoThumbnail} onChange={updateBeautyVideoForm} placeholder="/images/site/beauty-mehndi.jpg" />
+            </label>
+
+            {selectedVideoArtist?.videoUrl && (
+              <div className="beauty-video-mini-preview">
+                <Video size={16} />
+                <a href={selectedVideoArtist.videoUrl} target="_blank" rel="noreferrer">
+                  {selectedVideoArtist.videoTitle || "Current artist video"}
+                </a>
+              </div>
+            )}
+
+            <button className="btn btn-primary" type="submit" disabled={beautySaving || !beautyArtists.length}>
+              <Upload size={17} /> Save Artist Video
+            </button>
+          </form>
+        </div>
+
+        <div className="admin-table-filters">
+          <label className="search-box">
+            <Search size={15} />
+            <input
+              value={beautySearch}
+              onChange={(event) => setBeautySearch(event.target.value)}
+              placeholder="Search artists, salons, services..."
+            />
+          </label>
+        </div>
+
+        <div className="beauty-artist-grid">
+          {filteredBeautyArtists.length ? (
+            filteredBeautyArtists.map((artist) => {
+              const artistId = getBeautyArtistId(artist);
+              const artistServices = getBeautyServices(artist);
+              return (
+                <article className={`beauty-artist-admin-card ${artist.enabled === false ? "disabled" : ""}`} key={artistId}>
+                  <header>
+                    <img src={artist.image || "/images/site/expert-riya.jpg"} alt={artist.name} />
+                    <div>
+                      <span className="beauty-card-kicker"><Sparkles size={13} /> {artist.specialty || "Beauty Artist"}</span>
+                      <h3>{artist.name}</h3>
+                      <p>{artist.bio || "No artist bio added yet."}</p>
+                    </div>
+                  </header>
+
+                  <div className="beauty-card-meta">
+                    <span><MapPin size={13} /> {artist.region || "All Regions"}</span>
+                    <span><Star size={13} fill="currentColor" /> {Number(artist.rating || 0).toFixed(1)}</span>
+                    <span>{artist.salonName || "Independent artist"}</span>
+                  </div>
+
+                  <div className="beauty-service-list">
+                    {artistServices.length ? (
+                      artistServices.map((service, index) => {
+                        const serviceKey = service.id || String(index);
+                        return (
+                          <div className={`beauty-service-pill ${service.enabled === false ? "disabled" : ""}`} key={serviceKey}>
+                            <span>
+                              <strong>{service.title}</strong>
+                              <small>{formatMoney(service.price)} | {service.duration}</small>
+                            </span>
+                            <button
+                              className={`icon-button ${service.enabled === false ? "" : "success"}`}
+                              type="button"
+                              onClick={() => toggleBeautyServiceStatus(artist, serviceKey)}
+                              disabled={beautyUpdatingId === artistId}
+                              title={service.enabled === false ? "Turn service on" : "Turn service off"}
+                              aria-label={`${service.enabled === false ? "Enable" : "Disable"} ${service.title}`}
+                            >
+                              {service.enabled === false ? <ToggleLeft size={16} /> : <ToggleRight size={16} />}
+                            </button>
+                            <button
+                              className="icon-button danger"
+                              type="button"
+                              onClick={() => deleteBeautyService(artist, serviceKey)}
+                              disabled={beautyUpdatingId === artistId}
+                              title="Remove service"
+                              aria-label={`Remove ${service.title}`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <span className="beauty-empty-note">No beauty services added.</span>
+                    )}
+                  </div>
+
+                  {artist.videoUrl && (
+                    <div className="beauty-card-video">
+                      <video controls preload="metadata" poster={artist.videoThumbnail || artist.image || "/images/site/beauty-mehndi.jpg"}>
+                        <source src={artist.videoUrl} />
+                      </video>
+                      <a href={artist.videoUrl} target="_blank" rel="noreferrer">
+                        <Film size={14} /> {artist.videoTitle || "Artist video"}
+                      </a>
+                    </div>
+                  )}
+
+                  <footer className="beauty-card-actions">
+                    <button
+                      className={`icon-button ${artist.enabled === false ? "" : "success"}`}
+                      type="button"
+                      onClick={() => toggleBeautyArtistStatus(artist)}
+                      disabled={beautyUpdatingId === artistId}
+                      title={artist.enabled === false ? "Turn artist on" : "Turn artist off"}
+                      aria-label={`${artist.enabled === false ? "Enable" : "Disable"} ${artist.name}`}
+                    >
+                      {artist.enabled === false ? <ToggleLeft size={18} /> : <ToggleRight size={18} />}
+                    </button>
+                    <button className="icon-button" type="button" onClick={() => startEditBeautyArtist(artist)} title="Edit artist" aria-label={`Edit ${artist.name}`}>
+                      <Edit3 size={17} />
+                    </button>
+                    <button className="icon-button" type="button" onClick={() => loadBeautyVideoForm(artist)} title="Load video" aria-label={`Load video for ${artist.name}`}>
+                      <Video size={17} />
+                    </button>
+                    <button
+                      className="icon-button danger"
+                      type="button"
+                      onClick={() => deleteBeautyArtist(artist)}
+                      disabled={beautyDeletingId === artistId}
+                      title="Delete artist"
+                      aria-label={`Delete ${artist.name}`}
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  </footer>
+                </article>
+              );
+            })
+          ) : (
+            <div className="empty-state">
+              <Sparkles size={36} />
+              <strong>No beauty artists found</strong>
+              <span>No artist profiles match this view.</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderUsers = () => (
     <div className="admin-users-tab animated-fade-in">
       <div className="admin-table-filters">
@@ -1301,6 +1947,11 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
               <span>Services</span>
               {activeServiceCount > 0 && <span className="menu-badge info">{activeServiceCount}</span>}
             </button>
+            <button className={activeTab === "beauty" ? "active" : ""} onClick={() => setActiveTab("beauty")}>
+              <Sparkles size={16} />
+              <span>Beauty</span>
+              {activeBeautyArtistCount > 0 && <span className="menu-badge info">{activeBeautyArtistCount}</span>}
+            </button>
             <button className={activeTab === "users" ? "active" : ""} onClick={() => setActiveTab("users")}>
               <Users size={16} />
               <span>Users Directory</span>
@@ -1337,6 +1988,11 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
               {activeTab === "services" && (
                 <button className="btn btn-primary btn-add-service" onClick={() => setShowForm((value) => !value)}>
                   <Plus size={16} /> {showForm ? "Hide Form" : "Add Service"}
+                </button>
+              )}
+              {activeTab === "beauty" && (
+                <button className="btn btn-primary btn-add-service" onClick={() => (showBeautyArtistForm ? resetBeautyArtistForm() : openNewBeautyArtistForm())}>
+                  <Plus size={16} /> {showBeautyArtistForm ? "Hide Artist Form" : "Add Artist"}
                 </button>
               )}
               {activeTab === "bookings" && (
@@ -1452,6 +2108,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
             {activeTab === "overview" && renderOverview()}
             {activeTab === "bookings" && renderBookings()}
             {activeTab === "services" && renderServices()}
+            {activeTab === "beauty" && renderBeauty()}
             {activeTab === "users" && renderUsers()}
             {activeTab === "support" && renderSupport()}
             {activeTab === "settings" && renderSettings()}

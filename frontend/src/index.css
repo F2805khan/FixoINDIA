@@ -402,6 +402,8 @@ p { color: var(--secondary); line-height: 1.7; }
 input, textarea, select { width: 100%; border: 1px solid var(--border); border-radius: 8px; outline: 0; padding: 12px; color: var(--text); background: #ffffff; font-size: 12px; transition: .2s ease; }
 textarea { min-height: 90px; resize: vertical; }
 input:focus, textarea:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--glow); }
+input:required:placeholder-shown, textarea:required:placeholder-shown, .input-error { border-color: #b42323 !important; background-color: #fff8f8 !important; }
+input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focus, .input-error:focus { border-color: #b42323 !important; box-shadow: 0 0 0 3px rgba(180,35,35,0.15) !important; }
 .form-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 20px; }
 .payment-box { display: grid; grid-template-columns: auto 1fr auto; gap: 13px; align-items: center; padding: 17px; border: 1px solid var(--accent-border); border-radius: 10px; background: var(--accent-soft); }
 .payment-box svg { color: var(--accent-ink); }
@@ -1608,11 +1610,239 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); box-sha
   margin-bottom: 4px;
 }
 
+.admin-beauty-tab {
+  display: grid;
+  gap: 14px;
+}
+
+.beauty-admin-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.beauty-admin-summary article {
+  padding: 16px;
+  border: 1px solid var(--beauty-border);
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--beauty-bg), #ffffff);
+}
+
+.beauty-admin-summary svg {
+  color: var(--beauty);
+  margin-bottom: 8px;
+}
+
+.beauty-admin-summary span,
+.beauty-admin-summary small {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+
+.beauty-admin-summary strong {
+  display: block;
+  margin: 6px 0 3px;
+  font-size: 28px;
+  letter-spacing: -1px;
+}
+
+.beauty-admin-toolgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.beauty-tool-panel {
+  margin: 0;
+}
+
+.beauty-video-mini-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--beauty-border);
+  border-radius: 10px;
+  background: var(--beauty-bg);
+  color: var(--beauty);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.beauty-artist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.beauty-artist-grid > .empty-state {
+  grid-column: 1 / -1;
+}
+
+.beauty-artist-admin-card {
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.beauty-artist-admin-card.disabled {
+  opacity: .64;
+}
+
+.beauty-artist-admin-card header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.beauty-artist-admin-card header img {
+  width: 74px;
+  height: 74px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--beauty-bg);
+}
+
+.beauty-card-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--beauty);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .6px;
+  text-transform: uppercase;
+}
+
+.beauty-artist-admin-card h3 {
+  margin: 6px 0 5px;
+  font-size: 18px;
+  letter-spacing: -.7px;
+}
+
+.beauty-artist-admin-card p {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.beauty-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.beauty-card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--secondary);
+  background: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.beauty-card-meta svg {
+  color: var(--beauty);
+}
+
+.beauty-service-list {
+  display: grid;
+  gap: 8px;
+}
+
+.beauty-service-pill {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.beauty-service-pill.disabled {
+  opacity: .62;
+}
+
+.beauty-service-pill span {
+  min-width: 0;
+}
+
+.beauty-service-pill strong,
+.beauty-service-pill small {
+  display: block;
+}
+
+.beauty-service-pill strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.beauty-service-pill small,
+.beauty-empty-note {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.beauty-card-video {
+  display: grid;
+  gap: 8px;
+}
+
+.beauty-card-video video {
+  width: 100%;
+  height: 170px;
+  border: 1px solid var(--beauty-border);
+  border-radius: 12px;
+  background: #111111;
+  object-fit: cover;
+}
+
+.beauty-card-video a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--beauty);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.beauty-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
 @media (max-width: 760px) {
   .admin-analytics-grid,
   .backend-grid,
   .admin-form-grid,
-  .payment-settings-grid {
+  .payment-settings-grid,
+  .beauty-admin-summary,
+  .beauty-admin-toolgrid,
+  .beauty-artist-grid {
     grid-template-columns: 1fr;
   }
   .ml-program-grid {

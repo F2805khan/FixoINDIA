@@ -203,7 +203,7 @@ export function ProfileLoadingShell() {
       <section className="profile-intro">
         <span className="eyebrow">My account</span>
         <h1>Your profile.</h1>
-        <p>Loading your contact, booking, and subscription details.</p>
+        <p>Loading your contact and booking details.</p>
       </section>
       <section className="profile-card">
         <div className="profile-card-head">
@@ -215,7 +215,7 @@ export function ProfileLoadingShell() {
         </div>
         <div className="profile-section-layout">
           <aside className="profile-section-nav">
-            {["Name", "Address", "Bookings", "Subscription", "History"].map((label) => (
+            {["Name", "Address", "Bookings", "History"].map((label) => (
               <button type="button" key={label}>{label}</button>
             ))}
           </aside>
@@ -257,6 +257,8 @@ function Profile({ dashboardLayout = false }) {
   const [locating, setLocating] = useState(false);
   const [resolvingCity, setResolvingCity] = useState(false);
   const [statusBooking, setStatusBooking] = useState(null);
+  const [touched, setTouched] = useState({});
+  const [formSubmitted, setFormSubmitted] = useState(false);
   const formDirty = useRef(false);
   const editRequested = useRef(false);
   const reverseLookupTimer = useRef(null);
@@ -397,14 +399,22 @@ function Profile({ dashboardLayout = false }) {
     setForm((current) => ({ ...current, [name]: value }));
   };
 
+  const handleBlur = (event) => {
+    const { name } = event.target;
+    setTouched((current) => ({ ...current, [name]: true }));
+  };
+
   const beginEditing = () => {
     editRequested.current = true;
     setForm(profile || profileDefaults(user));
     setEditing(true);
+    setFormSubmitted(false);
+    setTouched({});
   };
 
   const save = async (event) => {
     event.preventDefault();
+    setFormSubmitted(true);
 
     if (!form.name.trim() || !form.phone.trim() || !form.address.trim() || !form.city.trim()) {
       toast.error("Name, phone, address, and city are required.");
@@ -419,6 +429,8 @@ function Profile({ dashboardLayout = false }) {
       formDirty.current = false;
       editRequested.current = false;
       setEditing(false);
+      setFormSubmitted(false);
+      setTouched({});
       toast.success(profile ? "Profile updated successfully." : "Profile created successfully.");
     } catch (error) {
       toast.error(error.message || "Could not save your profile.");
@@ -485,27 +497,6 @@ function Profile({ dashboardLayout = false }) {
     );
   };
 
-  const cancelSubscription = async () => {
-    if (!window.confirm("Cancel your Standard care plan? Your remaining credits will stay available until the end of the billing period.")) {
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const savedProfile = await saveUserProfile(
-        user,
-        { ...profile, subscriptionStatus: "cancelled" },
-        profile
-      );
-      setProfile(savedProfile);
-      setForm(savedProfile);
-      toast.success("Subscription cancelled.");
-    } catch (error) {
-      toast.error(error.message || "Could not cancel your subscription.");
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -640,18 +631,6 @@ function Profile({ dashboardLayout = false }) {
                 </div>
                 {renderBookings(currentBookings, "No active bookings yet.")}
               </section>
-
-              <article className="profile-subscription-card">
-                  <Sparkles size={21} />
-                  <span className="eyebrow">{account.subscriptionStatus === "cancelled" ? "Subscription cancelled" : "Current subscription"}</span>
-                  <h3>Standard care plan</h3>
-                  <p>{account.subscriptionStatus === "cancelled" ? "Your plan will end after the current billing period." : "2 of 3 monthly service credits available."}</p>
-                  <div className="progress"><span /></div>
-                  <div className="subscription-actions">
-                    <Link to="/pricing">Manage subscription <ArrowRight size={14} /></Link>
-                    {profile && account.subscriptionStatus !== "cancelled" && <button className="btn btn-danger btn-small" type="button" onClick={cancelSubscription} disabled={saving}>Cancel subscription</button>}
-                  </div>
-              </article>
             </div>
           </>
           )
@@ -676,7 +655,7 @@ function Profile({ dashboardLayout = false }) {
             <div className="profile-form-grid">
               <label>
                 <span>Full name</span>
-                <input required name="name" value={form.name} onChange={update} placeholder="Your full name" />
+                <input required name="name" value={form.name} onChange={update} onBlur={handleBlur} placeholder="Your full name" className={(!form.name?.trim() && (touched.name || formSubmitted)) ? "input-error" : ""} />
               </label>
               <label>
                 <span>Email</span>
@@ -684,20 +663,20 @@ function Profile({ dashboardLayout = false }) {
               </label>
               <label>
                 <span>Phone number</span>
-                <input required name="phone" value={form.phone} onChange={update} placeholder="+91 98765 43210" />
+                <input required name="phone" value={form.phone} onChange={update} onBlur={handleBlur} placeholder="+91 98765 43210" className={(!form.phone?.trim() && (touched.phone || formSubmitted)) ? "input-error" : ""} />
               </label>
               <label>
                 <span>City</span>
-                <input required name="city" value={form.city} onChange={update} placeholder="Bengaluru" />
+                <input required name="city" value={form.city} onChange={update} onBlur={handleBlur} placeholder="Bengaluru" className={(!form.city?.trim() && (touched.city || formSubmitted)) ? "input-error" : ""} />
               </label>
               <div className="profile-location-picker">
                 <div className="profile-map">
                   <LocationMap
-                    latitude={form.latitude}
-                    longitude={form.longitude}
-                    interactive
-                    onSelect={selectLocation}
-                  />
+                     latitude={form.latitude}
+                     longitude={form.longitude}
+                     interactive
+                     onSelect={selectLocation}
+                   />
                 </div>
                 <div className="profile-location-tools">
                   <div>
@@ -712,11 +691,11 @@ function Profile({ dashboardLayout = false }) {
               </div>
               <label className="profile-address">
                 <span>Service address</span>
-                <textarea required name="address" value={form.address} onChange={update} placeholder="House number, street, locality" />
+                <textarea required name="address" value={form.address} onChange={update} onBlur={handleBlur} placeholder="House number, street, locality" className={(!form.address?.trim() && (touched.address || formSubmitted)) ? "input-error" : ""} />
               </label>
             </div>
             <div className="profile-actions">
-              <button className="btn btn-ghost" type="button" onClick={() => { setForm(profile || profileDefaults(user)); formDirty.current = false; editRequested.current = false; setEditing(false); }}>
+              <button className="btn btn-ghost" type="button" onClick={() => { setForm(profile || profileDefaults(user)); formDirty.current = false; editRequested.current = false; setEditing(false); setFormSubmitted(false); setTouched({}); }}>
                 Cancel
               </button>
               <button className="btn btn-primary" disabled={saving}>

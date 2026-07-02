@@ -495,7 +495,6 @@ function HomePage({ onBookService }) {
     <section className="process-section section"><div className="shell"><SectionHead label="How it works" title="Three Steps. Zero Stress." copy="A smoother home starts with a few simple taps." /><div className="process-grid">{[["01", "Choose", "Pick a service and a slot that fits your day."], ["02", "Confirm", "Review your details and pay securely online."], ["03", "Relax", "A verified professional arrives right on time."]].map(([number, title, copy]) => <article className="process-step" key={number}><span>{number}</span><h3>{title}</h3><p>{copy}</p></article>)}</div></div></section>
     <section className="trust-section"><div className="marquee">{[...trustItems, ...trustItems].map((item, index) => <span key={`${item}-${index}`}><BadgeCheck size={17} /> {item}</span>)}</div><div className="shell testimonial-wrap"><SectionHead label="Loved at home" title="The Kind Of Service People Talk About." copy="The three highest-rated customer reviews are promoted here automatically." /><div className="testimonials">{featuredTestimonials.map(({ reviewId, name, city, service, text, rating, image }) => <article className="testimonial" key={reviewId}><div className="stars">{Array.from({ length: rating }).map((_, index) => <Star key={index} size={14} fill="currentColor" />)}</div><p>"{text}"</p><div className="testimonial-person">{image ? <img src={image} alt="" /> : <span className="review-avatar-fallback">{name.slice(0, 1).toUpperCase()}</span>}<div><strong>{name}</strong><span>{city} · {service}</span></div></div></article>)}</div><section className="review-submit-panel"><div><span className="eyebrow">Share your experience</span><h3>Had a visit worth talking about?</h3><p>Submit a rating and note. The best customer reviews automatically move into the testimonial cards above.</p></div><form onSubmit={submitReview}><div className="review-form-grid"><label><span>Your name</span><input required name="name" value={reviewForm.name} onChange={updateReview} placeholder="Your name" /></label><label><span>Email</span><input required name="email" type="email" value={reviewForm.email} onChange={updateReview} placeholder="you@example.com" /></label><label><span>City</span><input required name="city" value={reviewForm.city} onChange={updateReview} placeholder="Bengaluru" /></label><label><span>Service</span><select name="service" value={reviewForm.service} onChange={updateReview}><option>Home cleaning</option><option>Maintenance</option><option>Repairs</option><option>Beauty at home</option></select></label><div className="review-rating"><span>Rating</span><div>{Array.from({ length: 5 }).map((_, index) => { const rating = index + 1; return <button className={rating <= reviewForm.rating ? "active" : ""} type="button" key={rating} onClick={() => setReviewForm((current) => ({ ...current, rating }))} aria-label={`${rating} star rating`}><Star size={18} fill="currentColor" /></button>; })}</div></div></div><label className="review-message"><span>Your review</span><textarea required name="text" value={reviewForm.text} onChange={updateReview} placeholder="Tell us what made the service feel effortless." /></label><button className="btn btn-primary" type="submit" disabled={reviewSaving}>{reviewSaving ? "Saving review..." : "Submit review"} {!reviewSaving && <ArrowRight size={15} />}</button></form></section></div></section>
     <section className="beauty-teaser shell"><div><span className="beauty-eyebrow">FunService beauty</span><h2>Glow<br /><i>Delivered.</i></h2><p>Salon rituals, skin care, grooming and celebration-ready details, all in the comfort of home.</p><Link className="btn btn-beauty" to="/beauty">Explore Beauty <ArrowRight size={16} /></Link></div><div className="beauty-collage"><div className="beauty-tile tile-one"><Flower2 /></div><div className="beauty-tile tile-two"><Sparkles /></div><div className="beauty-tile tile-three"><Scissors /></div></div></section>
-    <section className="pricing-section shell section"><SectionHead label="Care plans" title="A Little Less To Think About" copy="Simple monthly plans for the tasks that keep life moving." link="/pricing" linkLabel="Compare plans" /><PricingCards condensed /></section>
     <section className="closing-cta shell"><span className="eyebrow">Ready when you are</span><h2>Give your to-do list<br />some breathing room.</h2><Link className="btn btn-primary" to="/services">Book your first service <ArrowRight size={16} /></Link></section>
   </main>;
 }
@@ -603,6 +602,8 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
   const [customer, setCustomer] = useState({ name: "", phone: "", address: "" });
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("");
+  const [bookingTouched, setBookingTouched] = useState({});
+  const [bookingSubmitted, setBookingSubmitted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const Icon = activeService.icon;
 
@@ -677,14 +678,18 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
 
   const openPayment = () => {
     if (!customer.name.trim() || !customer.phone.trim() || !customer.address.trim()) {
+      setBookingSubmitted(true);
       toast.error("Name, phone number, and service address are required.");
       return;
     }
+    setBookingSubmitted(false);
+    setBookingTouched({});
     setStep(3);
   };
 
   const continueFromSlot = () => {
     if (!customer.phone.trim()) {
+      setBookingSubmitted(true);
       toast.error("Mobile number is required for direct booking.");
       return;
     }
@@ -692,6 +697,8 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
       toast.error("Enter a valid mobile number (e.g. +91 98765 43210).");
       return;
     }
+    setBookingSubmitted(false);
+    setBookingTouched({});
     setStep(2);
   };
 
@@ -775,8 +782,8 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
       ) : (
         <>
           <div className="booking-steps">{["Slot", "Address", "Payment"].map((label, index) => <span className={step >= index + 1 ? "active" : ""} key={label}><b>{index + 1}</b>{label}</span>)}</div>
-          {step === 1 && <div className="booking-form"><span className="eyebrow">Step 01</span><h1>Choose a time that works.</h1><label><span>Mobile number</span><input name="phone" value={customer.phone} onChange={updateCustomer} placeholder="+91 98765 43210" /></label><div className="calendar-card"><div className="calendar-head"><strong>Next 3 days</strong><span>Available slots</span></div><div className="date-row three-day-row">{bookingDays.map((day) => <button key={day.key} className={selectedDate === day.key ? "active" : ""} onClick={() => setSelectedDate(day.key)}><span>{day.weekday}</span><b>{day.day}</b></button>)}</div></div><div className="time-grid">{defaultSlotTimes.map((time) => <button className={selectedTime === time ? "active" : ""} key={time} onClick={() => setSelectedTime(time)}>{time}</button>)}</div><button className="btn btn-primary" onClick={continueFromSlot}>Continue to address <ArrowRight size={16} /></button></div>}
-          {step === 2 && <div className="booking-form"><span className="eyebrow">Step 02</span><h1>Where should we arrive?</h1><label><span>Full name</span><input name="name" value={customer.name} onChange={updateCustomer} placeholder="Your name" /></label><label><span>Phone number</span><input name="phone" value={customer.phone} onChange={updateCustomer} placeholder="+91 98765 43210" /></label><label><span>Service address</span><textarea name="address" value={customer.address} onChange={updateCustomer} placeholder="Flat, building, street and landmark" /></label><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(1)}>Back</button><button className="btn btn-primary" onClick={openPayment}>Review payment <ArrowRight size={16} /></button></div></div>}
+          {step === 1 && <div className="booking-form"><span className="eyebrow">Step 01</span><h1>Choose a time that works.</h1><label><span>Mobile number</span><input required name="phone" value={customer.phone} onChange={updateCustomer} onBlur={() => setBookingTouched(curr => ({ ...curr, phone: true }))} placeholder="+91 98765 43210" className={(!customer.phone?.trim() && (bookingTouched.phone || bookingSubmitted)) ? "input-error" : ""} /></label><div className="calendar-card"><div className="calendar-head"><strong>Next 3 days</strong><span>Available slots</span></div><div className="date-row three-day-row">{bookingDays.map((day) => <button key={day.key} className={selectedDate === day.key ? "active" : ""} onClick={() => setSelectedDate(day.key)}><span>{day.weekday}</span><b>{day.day}</b></button>)}</div></div><div className="time-grid">{defaultSlotTimes.map((time) => <button className={selectedTime === time ? "active" : ""} key={time} onClick={() => setSelectedTime(time)}>{time}</button>)}</div><button className="btn btn-primary" onClick={continueFromSlot}>Continue to address <ArrowRight size={16} /></button></div>}
+          {step === 2 && <div className="booking-form"><span className="eyebrow">Step 02</span><h1>Where should we arrive?</h1><label><span>Full name</span><input required name="name" value={customer.name} onChange={updateCustomer} onBlur={() => setBookingTouched(curr => ({ ...curr, name: true }))} placeholder="Your name" className={(!customer.name?.trim() && (bookingTouched.name || bookingSubmitted)) ? "input-error" : ""} /></label><label><span>Phone number</span><input required name="phone" value={customer.phone} onChange={updateCustomer} onBlur={() => setBookingTouched(curr => ({ ...curr, phone: true }))} placeholder="+91 98765 43210" className={(!customer.phone?.trim() && (bookingTouched.phone || bookingSubmitted)) ? "input-error" : ""} /></label><label><span>Service address</span><textarea required name="address" value={customer.address} onChange={updateCustomer} onBlur={() => setBookingTouched(curr => ({ ...curr, address: true }))} placeholder="Flat, building, street and landmark" className={(!customer.address?.trim() && (bookingTouched.address || bookingSubmitted)) ? "input-error" : ""} /></label><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(1)}>Back</button><button className="btn btn-primary" onClick={openPayment}>Review payment <ArrowRight size={16} /></button></div></div>}
           {step === 3 && <div className="booking-form"><span className="eyebrow">Step 03</span><h1>Choose how to pay.</h1><div className="booking-quantity-box"><div><span>Quantity</span><strong>{quantity} service{quantity > 1 ? "s" : ""}</strong><small>₹{unitPrice} each</small></div><div className="quantity-control"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div>
             <div className="payment-method-grid">
               {paymentMethods.map((method) => {
@@ -872,9 +879,8 @@ function ContactPage() {
         <h1>We are here<br />when you need us.</h1>
         <p>Tell us what is happening and the care team will get back to you shortly.</p>
         <div className="contact-list">
-          <span><MessageCircle size={18} /><b>WhatsApp</b><small>+91 98765 43210</small></span>
           <span><Mail size={18} /><b>Email</b><small>support@funservice.in</small></span>
-          <span><Phone size={18} /><b>Call</b><small>Mon-Sun, 8 AM-10 PM</small></span>
+          <span><Phone size={18} /><b>Call</b><small>+91 8962635796 (Mon-Sun, 8 AM-10 PM)</small></span>
         </div>
       </section>
       <form className="contact-form" onSubmit={submit}>
@@ -924,7 +930,7 @@ function LegalPage({ title, type }) {
 }
 
 function Footer() {
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Your home. Handled. Trusted care for homes that have enough going on.</p></div><div><h4>Services</h4><Link to="/services">Home cleaning</Link><Link to="/services">Maintenance</Link><Link to="/beauty">Beauty at home</Link><Link to="/pricing">Care plans</Link></div><div><h4>Company</h4><Link to="/vision">AI Vision</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy policy</Link><Link to="/terms">Terms of service</Link><Link to="/cookies">Cookie policy</Link></div><div><h4>Connect</h4><a href="https://instagram.com"><Instagram size={15} /> Instagram</a><a href="https://wa.me/919876543210"><MessageCircle size={15} /> WhatsApp</a><span className="footer-note">Made for urban India</span></div></div><div className="shell footer-bottom"><span>© 2026 FunService. All rights reserved.</span><span>Securely booked. Thoughtfully delivered.</span></div></footer>;
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Your home. Handled. Trusted care for homes that have enough going on.</p></div><div><h4>Services</h4><Link to="/services">Home cleaning</Link><Link to="/services">Maintenance</Link><Link to="/beauty">Beauty at home</Link></div><div><h4>Company</h4><Link to="/vision">AI Vision</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy policy</Link><Link to="/terms">Terms of service</Link><Link to="/cookies">Cookie policy</Link></div><div><h4>Connect</h4><a href="#"><Instagram size={15} /> Instagram</a><a href="tel:8962635796"><Phone size={15} /> 8962635796</a><span className="footer-note">Made for urban India</span></div></div><div className="shell footer-bottom"><span>© 2026 FunService. All rights reserved.</span><span>Securely booked. Thoughtfully delivered.</span></div></footer>;
 }
 
 function CookieBanner() {
@@ -1041,7 +1047,7 @@ function App() {
           <Route path="/services" element={<Services services={generalServices} searchableServices={searchableServices} onBookService={addToCart} />} />
           <Route path="/cart" element={<CartPage cartItems={cartItems} onUpdateQuantity={updateCartQuantity} onRemove={removeFromCart} />} />
           <Route path="/beauty" element={<BeautyPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
+          <Route path="/pricing" element={<Navigate to="/" replace />} />
           <Route path="/vision" element={<AiGeneratorPage />} />
           <Route path="/book/:serviceId" element={<BookingPage cartItems={cartItems} onUpdateCartQuantity={updateCartQuantity} />} />
           <Route path="/auth" element={<LoginSignup />} />

@@ -12,6 +12,7 @@ const paymentPath = (bookingId) => `/payment/${encodeURIComponent(bookingId)}`;
 const supportMessagesPath = (userId) => `/support/messages/${encodeURIComponent(userId)}`;
 const adminBookingPath = (id) => `/admin/bookings/${encodeURIComponent(id)}`;
 const adminServicePath = (id) => `/admin/services/${encodeURIComponent(id)}`;
+const adminBeautyArtistPath = (id) => `/admin/beauty-artists/${encodeURIComponent(id)}`;
 const adminSupportPath = (id) => `/admin/support/${encodeURIComponent(id)}/reply`;
 const adminUserPasswordPath = (id) => `/admin/users/${encodeURIComponent(id)}/password`;
 
@@ -69,6 +70,11 @@ const notifyServicesChanged = () => {
   window.dispatchEvent(new Event("funservice:services-changed"));
 };
 
+const notifyBeautyChanged = () => {
+  localStorage.setItem("funservice-beauty-changed-at", new Date().toISOString());
+  window.dispatchEvent(new Event("funservice:beauty-changed"));
+};
+
 export const api = {
   hasToken: () => Boolean(localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY)),
   getToken: () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY),
@@ -117,6 +123,21 @@ export const api = {
     }),
   deleteService: (id) => request(adminServicePath(id), { method: "DELETE" }).then((response) => {
     notifyServicesChanged();
+    return response;
+  }),
+  getAdminBeautyArtists: () => request("/admin/beauty-artists?includeDisabled=true"),
+  createBeautyArtist: (payload) =>
+    request("/admin/beauty-artists", { method: "POST", body: JSON.stringify(payload) }).then((artist) => {
+      notifyBeautyChanged();
+      return artist;
+    }),
+  updateBeautyArtist: (id, payload) =>
+    request(adminBeautyArtistPath(id), { method: "PUT", body: JSON.stringify(payload) }).then((artist) => {
+      notifyBeautyChanged();
+      return artist;
+    }),
+  deleteBeautyArtist: (id) => request(adminBeautyArtistPath(id), { method: "DELETE" }).then((response) => {
+    notifyBeautyChanged();
     return response;
   }),
   createBooking: (payload) =>

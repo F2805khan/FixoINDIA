@@ -1,5 +1,11 @@
 import express from "express";
 import {
+  createBeautyArtist,
+  deleteBeautyArtist,
+  getBeautyArtists,
+  updateBeautyArtist
+} from "../controllers/beautyController.js";
+import {
   getAllBookings,
   getOverview,
   getPayments,
@@ -25,6 +31,10 @@ const router = express.Router();
 router.use(protect, owner);
 
 router.get("/overview", getOverview);
+router.get("/beauty-artists", getBeautyArtists);
+router.post("/beauty-artists", createBeautyArtist);
+router.put("/beauty-artists/:id", updateBeautyArtist);
+router.delete("/beauty-artists/:id", deleteBeautyArtist);
 router.get("/services", getServices);
 router.post("/services", createService);
 router.put("/services/:id", updateService);
