@@ -8,7 +8,7 @@ const normalizePhone = (phone) => {
 
 const bookingMessage = (booking) =>
   [
-    `FunService booking update: ${booking.bookingId}`,
+    `fixOindia booking update: ${booking.bookingId}`,
     `Service: ${booking.serviceName}`,
     `Customer: ${booking.customerName}`,
     `Phone: ${booking.phone}`,

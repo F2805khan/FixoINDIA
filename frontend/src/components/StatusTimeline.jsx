@@ -11,7 +11,7 @@ const stepIcons = [Check, UserCheck, Navigation, Wrench, Sparkles];
 const getStepSubtitle = (step, booking, index, currentIndex, etaMinutes) => {
   const dateTime =
     booking?.date && booking?.time ? `${booking.date}, ${booking.time}` : "Scheduled slot locked in";
-  const professional = booking?.professionalName || "FunService professional";
+  const professional = booking?.professionalName || "fixOindia professional";
 
   if (index < currentIndex) {
     if (step.key === "Confirmed") return `Booked for ${dateTime}`;
@@ -26,7 +26,7 @@ const getStepSubtitle = (step, booking, index, currentIndex, etaMinutes) => {
     if (step.key === "Professional Assigned") return `Matching the best pro near you`;
     if (step.key === "On The Way") return `Arriving in about ${etaMinutes} minutes`;
     if (step.key === "Service In Progress") return `${professional} is working on your service`;
-    if (step.key === "Completed") return "Thank you for booking with FunService";
+      if (step.key === "Completed") return "Thank you for booking with fixOindia";
     return "In progress";
   }
 

@@ -18,7 +18,7 @@ const faqs = [
   },
   {
     question: "What payment methods do you accept?",
-    answer: "FunService supports UPI, debit/credit card, net banking, wallets, and cash on service."
+    answer: "fixOindia supports UPI, debit/credit card, net banking, wallets, and cash on service."
   }
 ];
 

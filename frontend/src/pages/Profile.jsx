@@ -220,7 +220,7 @@ export function ProfileLoadingShell() {
             ))}
           </aside>
           <div className="profile-details">
-            <article><span>Full name</span><strong>FunService customer</strong></article>
+            <article><span>Full name</span><strong>fixOindia customer</strong></article>
             <article><span>Email</span><strong>customer@example.com</strong></article>
             <article><span>Phone</span><strong>+91 98765 43210</strong></article>
           </div>
@@ -520,7 +520,7 @@ function Profile({ dashboardLayout = false }) {
   ];
   const canOpenBackend = isPrivilegedUser(user);
   const dashboardMode = dashboardLayout || !editing;
-  const sidebarName = displayUserName(profile || user) || profile?.name || form.name || user?.email || "FunService customer";
+  const sidebarName = displayUserName(profile || user) || profile?.name || form.name || user?.email || "fixOindia customer";
   const sidebarYear = getMemberYear(profile?.createdAt || user?.createdAt);
   const greetingName = displayUserName(profile || user).split(" ")[0];
   const hasServiceAddress = Boolean(account.address?.trim() && account.city?.trim());

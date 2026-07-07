@@ -11,12 +11,17 @@ export const protect = asyncHandler(async (req, res, next) => {
     throw new Error("Not authorized, token missing");
   }
 
-  const decoded = jwt.verify(token, process.env.JWT_SECRET);
-  req.user = await User.findByPk(decoded.id, {
-    attributes: {
-      exclude: ["password", "otpCode", "otpExpires"]
-    }
-  });
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = await User.findByPk(decoded.id, {
+      attributes: {
+        exclude: ["password", "otpCode", "otpExpires"]
+      }
+    });
+  } catch (error) {
+    res.status(401);
+    throw new Error("Not authorized, token invalid or expired");
+  }
 
   if (!req.user) {
     res.status(401);

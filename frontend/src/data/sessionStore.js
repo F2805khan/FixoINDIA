@@ -6,7 +6,7 @@ export const isPrivilegedUser = (user) => ["admin", "owner"].includes(user?.role
 
 export const displayUserName = (user) => {
   const name = user?.name || user?.displayName || user?.userId || "";
-  return name.toLowerCase() === "quickfix admin" ? "FunService Control" : name || "Account";
+  return name.toLowerCase() === "quickfix admin" ? "fixOindia Control" : name || "Account";
 };
 
 const asBackendUser = (user) =>

@@ -171,7 +171,7 @@ const buildAgentBookingMessage = (booking) => {
     : "";
 
   return [
-    "FunService booking for agent",
+    "fixOindia booking for agent",
     `Booking ID: ${booking.bookingId || "Not assigned"}`,
     `Customer: ${booking.customerName || customer.name || "Customer"}`,
     `Mobile: ${booking.phone || customer.phone || "Phone not saved"}`,
@@ -1857,7 +1857,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
                       <button
                         className="btn btn-soft btn-small"
                         type="button"
-                        onClick={() => handleReplySupport(ticket._id || ticket.ticketId, "Complete")}
+                        onClick={() => handleReplySupport(ticket._id || ticket.ticketId, "Closed")}
                       >
                         Mark Complete
                       </button>
@@ -1869,7 +1869,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
                     <button
                       className="btn btn-soft btn-small"
                       type="button"
-                      onClick={() => handleReplySupport(ticket._id || ticket.ticketId, "Complete")}
+                      onClick={() => handleReplySupport(ticket._id || ticket.ticketId, "Closed")}
                     >
                       Mark Complete
                     </button>

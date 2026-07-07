@@ -13,6 +13,7 @@ import serviceRoutes from "./routes/serviceRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
 import imageRoutes from "./routes/imageRoutes.js";
 import locationRoutes from "./routes/locationRoutes.js";
+import eventRoutes from "./routes/eventRoutes.js";
 import ensureAdminUser from "./utils/ensureAdminUser.js";
 import { isEmailDeliveryConfigured } from "./utils/email.js";
 
@@ -31,7 +32,7 @@ app.use(express.json({ limit: "1mb" }));
 
 app.get("/", (req, res) => {
   res.json({
-    name: "FunService API",
+    name: "fixOindia API",
     tagline: "All Services. One Click.",
     health: "ok"
   });
@@ -59,6 +60,7 @@ app.use("/api/support", supportRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/images", imageRoutes);
 app.use("/api/location", locationRoutes);
+app.use("/api/events", eventRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -72,7 +74,7 @@ const start = async () => {
     console.warn("Resend email delivery is disabled. Set RESEND_API_KEY in backend/.env and restart the backend.");
   }
   app.listen(PORT, () => {
-    console.log(`FunService API running on port ${PORT}`);
+    console.log(`fixOindia API running on port ${PORT}`);
   });
 };
 

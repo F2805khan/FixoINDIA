@@ -41,7 +41,7 @@ function Navbar({ user, onLogout }) {
             <img src="/images/site/funservice-logo.svg" alt="" />
           </span>
           <span>
-            <strong>FunService</strong>
+            <strong>fixOindia</strong>
             <small>All Services. One Click.</small>
           </span>
         </Link>

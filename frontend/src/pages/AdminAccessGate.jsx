@@ -50,7 +50,7 @@ function AdminAccessGate({ onAuthSuccess }) {
           <span className="badge">
             <ShieldCheck size={15} /> Control access
           </span>
-          <h1>FunService Control</h1>
+          <h1>fixOindia Control</h1>
           <p>Sign in with your panel or owner ID to manage services, bookings, payments, and users.</p>
         </div>
 

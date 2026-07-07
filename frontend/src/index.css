@@ -38,7 +38,8 @@ p { color: var(--secondary); line-height: 1.7; }
 .shell { width: var(--shell); margin-inline: auto; }
 .section { padding: 116px 0; }
 
-.site-nav { position: sticky; top: 0; z-index: 80; border-bottom: 1px solid var(--border); background: rgba(255,254,250,.9); backdrop-filter: blur(22px); }
+.site-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 80; border-bottom: 1px solid var(--border); background: rgba(255,254,250,.95); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
+body:has(.site-nav) { padding-top: 68px; }
 .nav-inner { min-height: 68px; display: flex; align-items: center; gap: 28px; }
 .brand { display: inline-flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 800; letter-spacing: -1px; }
 .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; overflow: hidden; color: #ffffff; background: var(--accent); border-radius: 10px; box-shadow: 0 10px 24px rgba(5,150,105,.18); }
@@ -445,9 +446,9 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .notification-trigger { position: relative; z-index: 90; }
 .notification-button { position: relative; }
 .notification-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border: 2px solid #ffffff; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
-.notification-popup { position: absolute; top: calc(100% + 10px); right: 0; width: min(320px,calc(100vw - 32px)); max-height: 280px; display: grid; grid-template-rows: auto minmax(0,1fr) auto; overflow: hidden; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,254,250,.98); box-shadow: 0 16px 36px rgba(52,67,20,.16); animation: notification-drop .22s ease both; }
+.notification-popup { position: absolute; top: calc(100% + 10px); right: 0; width: min(380px,calc(100vw - 32px)); max-height: 380px; display: grid; grid-template-rows: auto minmax(0,1fr) auto; overflow: hidden; padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: rgba(255,254,250,.98); box-shadow: 0 16px 36px rgba(52,67,20,.16); animation: notification-drop .22s ease both; }
 .notification-popup-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-.notification-popup-head strong { font-size: 13px; letter-spacing: -.2px; }
+.notification-popup-head strong { font-size: 14px; letter-spacing: -.2px; }
 .notification-close { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; color: var(--muted); background: transparent; cursor: pointer; }
 .notification-close:hover { color: var(--text); background: var(--raised); }
 .notification-list { display: grid; gap: 8px; overflow-y: auto; padding-right: 2px; }
@@ -455,8 +456,8 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .notification-item.error .notification-icon { color: #b42323; border-color: #f0c4c4; background: #fff1f1; }
 .notification-item.success .notification-icon { color: var(--accent-ink); border-color: var(--accent-border); background: var(--accent-soft); }
 .notification-icon { width: 30px; height: 30px; display: grid; place-items: center; flex: 0 0 auto; color: var(--accent-ink); border: 1px solid var(--accent-border); border-radius: 10px; background: var(--accent-soft); }
-.notification-item strong { display: block; margin-bottom: 3px; font-size: 12px; }
-.notification-item p { margin: 0; color: var(--secondary); font-size: 11px; line-height: 1.5; }
+.notification-item strong { display: block; margin-bottom: 3px; font-size: 13px; }
+.notification-item p { margin: 0; color: var(--secondary); font-size: 12px; line-height: 1.5; }
 .notification-empty { margin: 0; padding: 14px 6px; color: var(--muted); font-size: 12px; text-align: center; }
 .notification-actions { display: flex; justify-content: flex-end; margin-top: 10px; }
 @keyframes notification-drop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -961,7 +962,7 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
   .nav-links .mobile-logout-link { color: #9b3030; }
   .nav-links a.active::after { display: none; }
   .nav-actions { display: flex; gap: 8px; }
-  .nav-actions > :not(.notification-trigger) { display: none; }
+  .nav-actions > :not(.notification-trigger):not(.cart-icon-button) { display: none; }
   .simple-catalog-head { grid-template-columns: 1fr; margin-top: 32px; }
   .simple-catalog-head h1 { font-size: 52px; letter-spacing: -4px; }
   .simple-section-title { align-items: start; flex-direction: column; }
@@ -1044,7 +1045,7 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
   .payment-method-grid { grid-template-columns: 1fr; }
   .booking-modal, .status-modal, .booking-confirmation-popup { padding: 18px; border-radius: 16px; }
   .modal-head { align-items: center; }
-  .notification-popup { right: -6px; width: min(300px,calc(100vw - 24px)); max-height: 240px; }
+  .notification-popup { right: -6px; width: min(350px,calc(100vw - 24px)); max-height: 320px; }
   .payment-options, .status-detail-grid { grid-template-columns: 1fr; }
   .booking-total, .status-summary { align-items: start; flex-direction: column; }
   .support-ticket-card { flex-direction: column; }
@@ -1070,6 +1071,43 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
   gap: 16px;
   padding: 18px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.owner-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.owner-brand span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-ink);
+}
+
+.owner-brand div {
+  display: flex;
+  flex-direction: column;
+}
+
+.owner-brand strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1.2;
+}
+
+.owner-brand small {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.owner-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 
 .owner-back {

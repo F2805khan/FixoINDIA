@@ -11,12 +11,12 @@ function Footer() {
               <img src="/images/site/funservice-logo.svg" alt="" />
             </span>
             <span>
-              <strong>FunService</strong>
+              <strong>fixOindia</strong>
               <small>All Services. One Click.</small>
             </span>
           </Link>
           <p>
-            FunService is your one-stop solution for all home services. We connect you with trusted
+            fixOindia is your one-stop solution for all home services. We connect you with trusted
             professionals and get things done quickly.
           </p>
         </div>
@@ -65,7 +65,7 @@ function Footer() {
           </div>
         </div>
       </div>
-      <div className="footer-bottom">© 2026 FunService. All rights reserved.</div>
+      <div className="footer-bottom">© 2026 fixOindia. All rights reserved.</div>
     </footer>
   );
 }

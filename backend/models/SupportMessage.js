@@ -25,8 +25,8 @@ SupportMessage.init(
     message: { type: DataTypes.TEXT, allowNull: false },
     reply: { type: DataTypes.TEXT, allowNull: true, defaultValue: "" },
     status: {
-      type: DataTypes.ENUM("Pending", "Open", "Replied", "Complete", "Closed"),
-      defaultValue: "Pending"
+      type: DataTypes.ENUM("Open", "Replied", "Closed"),
+      defaultValue: "Open"
     }
   },
   {

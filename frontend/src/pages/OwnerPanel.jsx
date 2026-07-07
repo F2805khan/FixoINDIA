@@ -41,8 +41,14 @@ function OwnerPanel() {
 
         const backendServices = await api.getAdminServices();
         setServices(backendServices || []);
-      } catch {
-        api.clearSession();
+      } catch (error) {
+        if (error.status === 401 || error.status === 403) {
+          api.clearSession();
+          setSession(null);
+          toast.error("Session expired. Please log in again.");
+        } else {
+          toast.error("Could not load latest admin details. Please check your connection.");
+        }
       } finally {
         setBooting(false);
       }
@@ -81,7 +87,7 @@ function OwnerPanel() {
         <div className="owner-brand">
           <span><LayoutDashboard size={17} /></span>
           <div>
-            <strong>FunService Control</strong>
+            <strong>fixOindia Control</strong>
             <small>Operations dashboard</small>
           </div>
         </div>

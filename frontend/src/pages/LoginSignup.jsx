@@ -167,7 +167,7 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
     const signedInCard = (
       <div className="auth-card auth-card-simple auth-signed-card">
         <span className="badge"><ShieldCheck size={15} /> Signed in</span>
-        <h1>{currentUser.displayName || currentUser.email || "FunService account"}</h1>
+        <h1>{currentUser.displayName || currentUser.email || "fixOindia account"}</h1>
         <p>Your account is active and ready for your next booking.</p>
         <div className="auth-signed-actions">
           <button className="btn btn-primary" onClick={() => accountDestination(currentUser)}>Continue</button>
@@ -344,7 +344,7 @@ function AuthVisual() {
       <div className="auth-static-visual">
         <div className="auth-static-card main">
           <span><ShieldCheck size={18} /> Secure Login</span>
-          <strong>FunService</strong>
+          <strong>fixOindia</strong>
           <small>Email OTP, phone lookup and Gmail access</small>
         </div>
         <div className="auth-static-card mini card-one">

@@ -430,7 +430,7 @@ export const verifyOtp = asyncHandler(async (req, res) => {
   const isSignup = !user;
   if (!user) {
     user = await User.create({
-      name: name || email?.split("@")[0] || "FunService Customer",
+      name: name || email?.split("@")[0] || "fixOindia Customer",
       email,
       phone: phone || null,
       userId: userId?.trim() ? userId.trim().toLowerCase() : undefined,
@@ -509,7 +509,7 @@ export const googleLogin = asyncHandler(async (req, res) => {
 
   if (!user) {
     user = await User.create({
-      name: decodedToken.name || email.split("@")[0] || "FunService Customer",
+      name: decodedToken.name || email.split("@")[0] || "fixOindia Customer",
       email,
       phone: decodedToken.phone_number || null,
       address: "",

@@ -35,7 +35,7 @@ function StatusModal({ booking, onCancel, onClose }) {
           <img src={booking.professionalPhoto || professionalPhoto} alt={booking.professionalName} />
           <div>
             <strong>{booking.professionalName || "Ramesh Kumar"}</strong>
-            <p>{booking.serviceName || booking.service?.title || "FunService Professional"}</p>
+            <p>{booking.serviceName || booking.service?.title || "fixOindia Professional"}</p>
             <small>Estimated arrival: {booking.estimatedArrival || "12 minutes"}</small>
           </div>
         </div>

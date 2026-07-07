@@ -116,7 +116,7 @@ function BookingModal({
         <div className="modal-head">
           <div>
             <h2>{successBooking ? "Booking Confirmed" : "Book a Service"}</h2>
-            <p>{successBooking ? "Your FunService professional is being tracked live." : "Fast service in under 30 minutes."}</p>
+            <p>{successBooking ? "Your fixOindia professional is being tracked live." : "Fast service in under 30 minutes."}</p>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close booking form">
             <X size={20} />
@@ -206,7 +206,7 @@ function BookingModal({
 
               <div className="gateway-card">
                 <CreditCard size={28} />
-                <span>FunService Secure Gateway</span>
+                <span>fixOindia Secure Gateway</span>
                 <small>UPI, cards, net banking, wallet, and cash supported</small>
               </div>
 
