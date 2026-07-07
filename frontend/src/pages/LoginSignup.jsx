@@ -134,6 +134,7 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
       toast.success(response.user ? "Gmail login complete." : "Logged in with Gmail.");
       accountDestination(response.user);
     } catch (error) {
+      console.error("Google Login Catch Error details:", error);
       if (auth.currentUser && !api.hasToken()) await signOut(auth);
       if (error.code === "auth/unauthorized-domain") {
         showError(`Authorize ${window.location.hostname} in Firebase Authentication settings.`, "Firebase setup needed");
