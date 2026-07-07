@@ -5,13 +5,16 @@ const logging = process.env.SQL_DEBUG === "true" ? console.log : false;
 
 const createSequelize = () => {
   const uri = process.env.MYSQL_URL?.trim();
+  const ssl =
+    process.env.MYSQL_SSL === "true"
+      ? { ssl: { rejectUnauthorized: process.env.MYSQL_SSL_REJECT_UNAUTHORIZED === "true" } }
+      : {};
 
   if (uri) {
     return new Sequelize(uri, {
       dialect: "mysql",
       logging,
-      dialectOptions:
-        process.env.MYSQL_SSL === "true" ? { ssl: { rejectUnauthorized: true } } : {},
+      dialectOptions: ssl,
       define: {
         underscored: false,
         timestamps: true,
@@ -39,6 +42,7 @@ const createSequelize = () => {
     port,
     dialect: "mysql",
     logging,
+    dialectOptions: ssl,
     define: {
       underscored: false,
       timestamps: true,
