@@ -5,6 +5,7 @@
   "description": "FunService full-stack home services marketplace with React and Express.",
   "scripts": {
     "install:all": "npm install --prefix frontend && npm install --prefix backend",
+    "postinstall": "npm run install:all",
     "build": "npm run build --prefix frontend",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend"
