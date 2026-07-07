@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: fixoindia-backend
+    env: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 30d
+      - key: ALLOW_DEMO_GOOGLE_AUTH
+        value: "true"
+      - key: MYSQL_URL
+        sync: false
