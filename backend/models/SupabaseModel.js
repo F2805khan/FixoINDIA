@@ -38,8 +38,15 @@ const toDbRow = (colMap, data) => {
 const fromDbRow = (revMap, data) => {
   if (!data || typeof data !== "object") return data;
   const out = {};
+  const mappedDbKeys = new Set(Object.keys(revMap));
+
   for (const [key, value] of Object.entries(data)) {
-    out[fromDbCol(revMap, key)] = value;
+    const appKey = fromDbCol(revMap, key);
+    if (mappedDbKeys.has(key)) {
+      out[appKey] = value;
+    } else if (!(appKey in out)) {
+      out[appKey] = value;
+    }
   }
   return out;
 };

@@ -22,9 +22,9 @@ import { Skeleton } from "boneyard-js/react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { api } from "../api/client.js";
-import { getCachedUserProfile, getUserProfile, profileDefaults, saveUserProfile } from "../data/profileStore.js";
+import { getCachedUserProfile, getUserProfile, mergeProfiles, onProfileChanged, profileDefaults, publishProfileUpdate, saveUserProfile } from "../data/profileStore.js";
 import { getCachedUserBookings, getUserBookings } from "../data/bookingStore.js";
-import { displayUserName, isPrivilegedUser, onSessionChanged } from "../data/sessionStore.js";
+import { displayUserName, isPrivilegedUser, onProfileUpdated, onSessionChanged } from "../data/sessionStore.js";
 import { isActiveBookingStatus } from "../utils/bookingTracking.js";
 
 const defaultMapCenter = { latitude: 12.9716, longitude: 77.5946 };
@@ -243,6 +243,8 @@ function Profile({ dashboardLayout = false }) {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTab = searchParams.get("tab");
+  const setupMode = searchParams.get("setup") === "1";
+  const editQuery = searchParams.get("edit");
   const profileSection = selectedTab === "history" || selectedTab === "support" ? selectedTab : "overview";
   const trackLive = searchParams.get("track") === "live";
   const [user, setUser] = useState(null);
@@ -252,6 +254,7 @@ function Profile({ dashboardLayout = false }) {
   const [supportLoading, setSupportLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [editSection, setEditSection] = useState("all");
   const [bookings, setBookings] = useState([]);
   const [supportMessages, setSupportMessages] = useState([]);
   const [locating, setLocating] = useState(false);
@@ -261,11 +264,24 @@ function Profile({ dashboardLayout = false }) {
   const [formSubmitted, setFormSubmitted] = useState(false);
   const formDirty = useRef(false);
   const editRequested = useRef(false);
+  const lastProfileSaveAt = useRef(0);
+  const contactSectionRef = useRef(null);
+  const addressSectionRef = useRef(null);
   const reverseLookupTimer = useRef(null);
   const reverseLookupId = useRef(0);
 
   useEffect(() => {
     let active = true;
+
+    const applyProfileState = (nextProfile, nextUser, { keepForm = false } = {}) => {
+      if (!nextProfile) return;
+
+      setProfile((current) => mergeProfiles(nextProfile, current));
+      if (!keepForm && !formDirty.current && !editRequested.current) {
+        setForm((current) => mergeProfiles(nextProfile, current));
+      }
+      if (nextUser) setUser(nextUser);
+    };
 
     const loadProfile = async (nextUser) => {
       if (!nextUser) {
@@ -274,12 +290,29 @@ function Profile({ dashboardLayout = false }) {
       }
 
       const cachedProfile = getCachedUserProfile(nextUser.uid);
+      const shouldKeepEditing =
+        editRequested.current || editQuery === "contact" || editQuery === "address" || setupMode;
+
       setUser(nextUser);
-      setProfile(cachedProfile);
-      setForm(cachedProfile || profileDefaults(nextUser));
-      formDirty.current = false;
-      editRequested.current = false;
-      setEditing(false);
+      if (cachedProfile) {
+        applyProfileState(cachedProfile, null, { keepForm: shouldKeepEditing });
+      } else if (!shouldKeepEditing) {
+        setForm(profileDefaults(nextUser));
+      }
+
+      if (!shouldKeepEditing) {
+        formDirty.current = false;
+        setEditing(false);
+        setEditSection("all");
+      } else if (editQuery === "contact" || editQuery === "address") {
+        editRequested.current = true;
+        setEditSection(editQuery);
+        setEditing(true);
+      } else if (setupMode) {
+        editRequested.current = true;
+        setEditing(true);
+      }
+
       setBookings(getCachedUserBookings(nextUser.uid));
       setSupportMessages([]);
       setLoading(false);
@@ -301,11 +334,17 @@ function Profile({ dashboardLayout = false }) {
       setBookings(savedBookings);
       setSupportMessages(Array.isArray(savedSupportMessages) ? savedSupportMessages : []);
       setSupportLoading(false);
-      if (savedProfile) {
-        setProfile(savedProfile);
-        if (!formDirty.current && !editRequested.current) {
-          setForm(savedProfile);
-        }
+
+      const recentlySaved = Date.now() - lastProfileSaveAt.current < 5000;
+      const freshCachedProfile = getCachedUserProfile(nextUser.uid);
+      const profileToApply = recentlySaved
+        ? mergeProfiles(freshCachedProfile, savedProfile)
+        : mergeProfiles(savedProfile, freshCachedProfile);
+
+      if (profileToApply) {
+        applyProfileState(profileToApply, nextUser, {
+          keepForm: formDirty.current || editRequested.current
+        });
       }
     };
 
@@ -315,7 +354,63 @@ function Profile({ dashboardLayout = false }) {
       active = false;
       unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, setupMode, editQuery]);
+
+  useEffect(() => {
+    const unsubscribe = onProfileChanged((savedProfile) => {
+      if (!user?.uid || savedProfile.uid !== user.uid) return;
+
+      lastProfileSaveAt.current = Date.now();
+      setProfile(savedProfile);
+
+      if (!formDirty.current && !editRequested.current) {
+        setForm(savedProfile);
+      }
+
+      setUser((current) =>
+        current
+          ? {
+              ...current,
+              name: savedProfile.name,
+              displayName: savedProfile.name,
+              phone: savedProfile.phone,
+              phoneNumber: savedProfile.phone,
+              address: savedProfile.address,
+              city: savedProfile.city,
+              email: savedProfile.email
+            }
+          : current
+      );
+    });
+
+    return unsubscribe;
+  }, [user?.uid]);
+
+  useEffect(() => {
+    const unsubscribe = onProfileUpdated((nextUser) => {
+      if (!nextUser) return;
+      setUser(nextUser);
+      const cachedProfile = getCachedUserProfile(nextUser.uid);
+      if (cachedProfile) {
+        setProfile((current) => mergeProfiles(cachedProfile, current));
+        if (!formDirty.current && !editRequested.current) {
+          setForm((current) => mergeProfiles(cachedProfile, current));
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (loading || !user) return;
+    if (editQuery !== "contact" && editQuery !== "address") return;
+
+    editRequested.current = true;
+    setEditSection(editQuery);
+    setEditing(true);
+    setForm((current) => (formDirty.current ? current : profile || profileDefaults(user)));
+  }, [editQuery, loading, user, profile]);
 
   useEffect(() => () => clearTimeout(reverseLookupTimer.current), []);
 
@@ -404,12 +499,65 @@ function Profile({ dashboardLayout = false }) {
     setTouched((current) => ({ ...current, [name]: true }));
   };
 
-  const beginEditing = () => {
+  const applySavedProfile = (savedProfile) => {
+    lastProfileSaveAt.current = Date.now();
+    setProfile(savedProfile);
+    setForm(savedProfile);
+    setUser((current) =>
+      current
+        ? {
+            ...current,
+            name: savedProfile.name,
+            displayName: savedProfile.name,
+            phone: savedProfile.phone,
+            phoneNumber: savedProfile.phone,
+            address: savedProfile.address,
+            city: savedProfile.city,
+            email: savedProfile.email,
+            latitude: savedProfile.latitude,
+            longitude: savedProfile.longitude
+          }
+        : current
+    );
+  };
+
+  const beginEditing = (section = "all") => {
     editRequested.current = true;
     setForm(profile || profileDefaults(user));
+    setEditSection(section);
     setEditing(true);
     setFormSubmitted(false);
     setTouched({});
+
+    const next = new URLSearchParams(searchParams);
+    if (section === "contact" || section === "address") {
+      next.set("edit", section);
+    } else {
+      next.delete("edit");
+    }
+    next.delete("setup");
+    setSearchParams(next, { replace: true });
+
+    window.requestAnimationFrame(() => {
+      const target = section === "address" ? addressSectionRef.current : contactSectionRef.current;
+      target?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
+
+  const closeEditing = ({ resetForm = true } = {}) => {
+    if (resetForm) {
+      setForm(profile || profileDefaults(user));
+    }
+    formDirty.current = false;
+    editRequested.current = false;
+    setEditing(false);
+    setEditSection("all");
+    setFormSubmitted(false);
+    setTouched({});
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
   };
 
   const save = async (event) => {
@@ -422,17 +570,32 @@ function Profile({ dashboardLayout = false }) {
     }
 
     setSaving(true);
+
+    const previousProfile = profile;
+    const optimisticProfile = publishProfileUpdate({
+      ...(profile || profileDefaults(user)),
+      ...form,
+      uid: user.uid,
+      updatedAt: new Date().toISOString()
+    });
+    applySavedProfile(optimisticProfile);
+
     try {
       const savedProfile = await saveUserProfile(user, form, profile);
-      setProfile(savedProfile);
-      setForm(savedProfile);
-      formDirty.current = false;
-      editRequested.current = false;
-      setEditing(false);
-      setFormSubmitted(false);
-      setTouched({});
+      applySavedProfile(savedProfile);
       toast.success(profile ? "Profile updated successfully." : "Profile created successfully.");
+      closeEditing({ resetForm: false });
+
+      if (setupMode) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("setup");
+        setSearchParams(next, { replace: true });
+      }
     } catch (error) {
+      if (previousProfile) {
+        applySavedProfile(previousProfile);
+        publishProfileUpdate(previousProfile);
+      }
       toast.error(error.message || "Could not save your profile.");
     } finally {
       setSaving(false);
@@ -512,18 +675,20 @@ function Profile({ dashboardLayout = false }) {
     );
   }
 
-  const account = profile || profileDefaults(user);
+  const savedAccount = profile || profileDefaults(user);
+  const liveAccount = editing ? { ...savedAccount, ...form } : savedAccount;
   const details = [
-    ["Full name", account.name || "Not added", UserRound],
-    ["Email", account.email || "Not added", Mail],
-    ["Phone", account.phone || "Not added", Phone]
+    ["Full name", liveAccount.name || "Not added", UserRound],
+    ["Email", liveAccount.email || "Not added", Mail],
+    ["Phone", liveAccount.phone || "Not added", Phone]
   ];
   const canOpenBackend = isPrivilegedUser(user);
   const dashboardMode = dashboardLayout || !editing;
-  const sidebarName = displayUserName(profile || user) || profile?.name || form.name || user?.email || "fixOindia customer";
+  const sidebarName =
+    displayUserName(liveAccount) || liveAccount.name || user?.email || "fixOindia customer";
   const sidebarYear = getMemberYear(profile?.createdAt || user?.createdAt);
-  const greetingName = displayUserName(profile || user).split(" ")[0];
-  const hasServiceAddress = Boolean(account.address?.trim() && account.city?.trim());
+  const greetingName = displayUserName(liveAccount).split(" ")[0];
+  const hasServiceAddress = Boolean(liveAccount.address?.trim() && liveAccount.city?.trim());
   const dashboardTitle = `Good morning, ${greetingName}.`;
   const dashboardCopy = hasServiceAddress
     ? "Your contact, address, bookings and plan in one simple place."
@@ -594,13 +759,18 @@ function Profile({ dashboardLayout = false }) {
                 <h1>{dashboardTitle}</h1>
                 <p>{dashboardCopy}</p>
               </div>
-              <button className="btn btn-primary btn-small" type="button" onClick={beginEditing}>Edit profile <ArrowRight size={14} /></button>
             </div>
             <div className="profile-simple-grid">
-              <section className="profile-simple-panel">
+              <section className="profile-simple-panel" ref={contactSectionRef}>
                 <div className="profile-mini-head">
                   <span className="eyebrow">Contact</span>
-                  <button className="btn btn-ghost btn-small" type="button" onClick={beginEditing}>Edit</button>
+                  <button
+                    className="btn btn-soft btn-small profile-section-edit-btn"
+                    type="button"
+                    onClick={() => beginEditing("contact")}
+                  >
+                    Edit
+                  </button>
                 </div>
                 <div className="profile-details">
                   {details.map(([label, value, Icon]) => (
@@ -613,15 +783,19 @@ function Profile({ dashboardLayout = false }) {
                 </div>
               </section>
 
-              <article className="profile-address-card simple-address-card">
+              <article className="profile-address-card simple-address-card" ref={addressSectionRef}>
                   <div className="profile-address-head">
                     <span><MapPin size={14} /> Default service address</span>
-                    <button className="btn btn-ghost btn-small" type="button" onClick={beginEditing}>
+                    <button
+                      className="btn btn-soft btn-small profile-section-edit-btn"
+                      type="button"
+                      onClick={() => beginEditing("address")}
+                    >
                       Edit address
                     </button>
                   </div>
-                  <h3>{account.address || "No service address added yet."}</h3>
-                  <p>{account.city || "Add your city to speed up bookings."}</p>
+                  <h3>{liveAccount.address || "No service address added yet."}</h3>
+                  <p>{liveAccount.city || "Add your city to speed up bookings."}</p>
               </article>
 
               <section className="profile-simple-panel">
@@ -695,7 +869,7 @@ function Profile({ dashboardLayout = false }) {
               </label>
             </div>
             <div className="profile-actions">
-              <button className="btn btn-ghost" type="button" onClick={() => { setForm(profile || profileDefaults(user)); formDirty.current = false; editRequested.current = false; setEditing(false); setFormSubmitted(false); setTouched({}); }}>
+              <button className="btn btn-ghost" type="button" onClick={() => closeEditing()}>
                 Cancel
               </button>
               <button className="btn btn-primary" disabled={saving}>

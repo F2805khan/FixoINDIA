@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "./utils/notifications.js";
 import NotificationCenter from "./components/NotificationCenter.jsx";
+import CouponApplyBox from "./components/CouponApplyBox.jsx";
 import OwnerPanel from "./pages/OwnerPanel.jsx";
 import LoginSignup from "./pages/LoginSignup.jsx";
 import Profile, { ProfileSkeletonCapture } from "./pages/Profile.jsx";
@@ -15,10 +16,10 @@ import {
   WalletCards, WandSparkles, WashingMachine, Wind, Wrench, X, Zap
 } from "lucide-react";
 import { api } from "./api/client.js";
-import { getUserProfile } from "./data/profileStore.js";
+import { getUserProfile, onProfileChanged } from "./data/profileStore.js";
 import { saveUserBooking } from "./data/bookingStore.js";
 import { getBestCustomerReviews, getCustomerReviews, saveCustomerReview } from "./data/reviewStore.js";
-import { displayUserName, isPrivilegedUser, logoutSession, onSessionChanged } from "./data/sessionStore.js";
+import { displayUserName, isPrivilegedUser, logoutSession, onProfileUpdated, onSessionChanged } from "./data/sessionStore.js";
 
 const isPhoneLike = (value) => /^[+\d][\d\s-]{7,}$/.test(String(value || "").trim());
 
@@ -241,7 +242,14 @@ function Navbar({ cartCount = 0 }) {
     { to: "/contact", label: "Customer Support" }
   ];
 
-  useEffect(() => onSessionChanged(setUser), []);
+  useEffect(() => {
+    const unsubSession = onSessionChanged(setUser);
+    const unsubProfile = onProfileUpdated(setUser);
+    return () => {
+      unsubSession();
+      unsubProfile();
+    };
+  }, []);
 
   const logout = async () => {
     if (loggingOut) return;
@@ -518,7 +526,21 @@ function PricingPage() {
 }
 
 function CartPage({ cartItems, onUpdateQuantity, onRemove }) {
-  const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discountAmount = Number(appliedCoupon?.discountAmount) || 0;
+  const total = appliedCoupon ? Number(appliedCoupon.finalAmount) : subtotal;
+
+  useEffect(() => {
+    const unsubSession = onSessionChanged(setUser);
+    const unsubProfile = onProfileUpdated(setUser);
+    return () => {
+      unsubSession();
+      unsubProfile();
+    };
+  }, []);
 
   return <main className="page shell cart-page">
     <div className="breadcrumb"><Link to="/">Home</Link><ChevronRight size={13} /><span>Cart</span></div>
@@ -557,8 +579,33 @@ function CartPage({ cartItems, onUpdateQuantity, onRemove }) {
           ))}
         </section>
         <aside className="cart-total-card">
-          <span className="eyebrow">Cart total</span>
-          <strong>₹{total}</strong>
+          <span className="eyebrow">Order summary</span>
+          <div className="cart-summary-line">
+            <span>Subtotal</span>
+            <strong>₹{subtotal}</strong>
+          </div>
+          {appliedCoupon && (
+            <div className="cart-summary-line cart-summary-discount">
+              <span>Coupon ({appliedCoupon.code})</span>
+              <strong>-₹{discountAmount}</strong>
+            </div>
+          )}
+          <div className="cart-summary-total">
+            <span>Total</span>
+            <strong>{appliedCoupon ? <><small>₹{subtotal}</small> ₹{total}</> : `₹${total}`}</strong>
+          </div>
+          <CouponApplyBox
+            orderAmount={subtotal}
+            user={user}
+            appliedCoupon={appliedCoupon}
+            onApplied={setAppliedCoupon}
+            onRemoved={() => setAppliedCoupon(null)}
+            onLoginRequired={() => {
+              toast.error("Sign in before applying a coupon.");
+              navigate("/auth");
+            }}
+            className="cart-coupon-box"
+          />
           <p>{cartItems.length} service{cartItems.length > 1 ? "s" : ""} added. Choose “Book this” on any item to continue checkout.</p>
         </aside>
       </div>
@@ -606,10 +653,7 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
   const [bookingSubmitted, setBookingSubmitted] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [confirmedBooking, setConfirmedBooking] = useState(null);
-  const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
-  const [couponApplying, setCouponApplying] = useState(false);
-  const [couponError, setCouponError] = useState("");
   const Icon = activeService.icon;
 
   const paymentIcons = {
@@ -625,10 +669,6 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
   const bookingTotal = appliedCoupon ? Number(appliedCoupon.finalAmount) : bookingSubtotal;
   const updateQuantity = (nextQuantity) => {
     const safeQuantity = Math.max(1, Math.min(10, nextQuantity));
-    if (safeQuantity !== quantity) {
-      setAppliedCoupon(null);
-      setCouponError("");
-    }
     setQuantity(safeQuantity);
     if (cartItem) onUpdateCartQuantity?.(cartItem.id, safeQuantity);
   };
@@ -638,22 +678,33 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
   }, [cartItem?.quantity]);
 
   useEffect(() => {
-    const unsubscribe = onSessionChanged(async (nextUser) => {
+    const applyBookingProfile = (savedProfile) => {
+      if (!savedProfile) return;
+      setProfile(savedProfile);
+      setCustomer({
+        name: savedProfile.name || "",
+        phone: savedProfile.phone || "",
+        address: [savedProfile.address, savedProfile.city].filter(Boolean).join(", ")
+      });
+    };
+
+    const unsubSession = onSessionChanged(async (nextUser) => {
       setUser(nextUser);
-      if (!nextUser) return;
+      if (!nextUser) {
+        setProfile(null);
+        return;
+      }
 
       const savedProfile = await getUserProfile(nextUser);
-      setProfile(savedProfile);
-      if (savedProfile) {
-        setCustomer({
-          name: savedProfile.name || "",
-          phone: savedProfile.phone || "",
-          address: [savedProfile.address, savedProfile.city].filter(Boolean).join(", ")
-        });
-      }
+      applyBookingProfile(savedProfile);
     });
 
-    return () => unsubscribe();
+    const unsubProfile = onProfileChanged(applyBookingProfile);
+
+    return () => {
+      unsubSession();
+      unsubProfile();
+    };
   }, []);
 
   useEffect(() => {
@@ -711,39 +762,6 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
     setBookingSubmitted(false);
     setBookingTouched({});
     setStep(2);
-  };
-
-  const applyCoupon = async () => {
-    const code = couponCode.trim();
-    if (!code) {
-      setCouponError("Enter a coupon code.");
-      return;
-    }
-
-    if (!user) {
-      toast.error("Sign in before applying a coupon.");
-      navigate("/auth");
-      return;
-    }
-
-    setCouponApplying(true);
-    setCouponError("");
-    try {
-      const result = await api.applyCoupon({ code, orderAmount: bookingSubtotal });
-      setAppliedCoupon(result);
-      setCouponCode(result.code);
-      toast.success(`Coupon ${result.code} applied.`);
-    } catch (error) {
-      setAppliedCoupon(null);
-      setCouponError(error.message || "Coupon could not be applied.");
-    } finally {
-      setCouponApplying(false);
-    }
-  };
-
-  const removeCoupon = () => {
-    setAppliedCoupon(null);
-    setCouponError("");
   };
 
   const confirmBooking = async () => {
@@ -811,6 +829,25 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
     navigate("/profile?tab=history", { state: { freshBooking: confirmedBooking } });
   };
 
+  const closeBookingConfirmation = (event) => {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+    setConfirmedBooking(null);
+  };
+
+  useEffect(() => {
+    if (!confirmedBooking) return undefined;
+
+    const onEscape = (event) => {
+      if (event.key === "Escape") {
+        closeBookingConfirmation(event);
+      }
+    };
+
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [confirmedBooking]);
+
   const selectedPaymentType = paymentMethods.find(({ method }) => method === paymentMethod)?.type;
   const isCashBooking = selectedPaymentType === "cash";
   const noPaymentMethods = paymentMethods.length === 0;
@@ -864,35 +901,36 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
                 );
               })}
             </div>
-            <div className="coupon-apply-box">
-              <label>
-                <span>Coupon code</span>
-                <div className="coupon-input-row">
-                  <input value={couponCode} onChange={(event) => { setCouponCode(event.target.value.toUpperCase()); setCouponError(""); }} placeholder="SAVE100" disabled={couponApplying || Boolean(appliedCoupon)} />
-                  {appliedCoupon ? (
-                    <button className="btn btn-ghost btn-small" type="button" onClick={removeCoupon}>Remove</button>
-                  ) : (
-                    <button className="btn btn-primary btn-small" type="button" onClick={applyCoupon} disabled={couponApplying}>
-                      {couponApplying ? "Applying..." : "Apply"}
-                    </button>
-                  )}
-                </div>
-              </label>
-              {appliedCoupon && <p className="coupon-success"><CheckCircle2 size={14} /> {appliedCoupon.code} applied. You saved ₹{bookingDiscount}.</p>}
-              {couponError && <p className="coupon-error">{couponError}</p>}
-            </div>
             {!paymentMethods.length && <p className="payment-empty">No payment method is available right now. Please contact support.</p>}<div className="review-box"><span>{selectedDayLabel} at {selectedTime} · Qty {quantity}{appliedCoupon ? ` · Coupon ${appliedCoupon.code}` : ""}</span><strong>{appliedCoupon ? <><small>₹{bookingSubtotal}</small> ₹{bookingTotal}</> : `₹${bookingTotal}`}</strong></div><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button><button className="btn btn-primary" onClick={confirmBooking} disabled={processing || !paymentMethods.length}>{processing ? "Checking payment status..." : paymentMethods.find(({ method }) => method === paymentMethod)?.type === "cash" ? "Confirm cash booking" : "Pay and confirm"} {!processing && <ArrowRight size={16} />}</button></div></div>}
         </>
       )}
       </section>
       <aside className="simple-cart-column">
         <article className="simple-promise-card"><div><h3>Fun Promise</h3><p><Check size={15} /> Verified professionals</p><p><Check size={15} /> Hassle-free booking</p><p><Check size={15} /> Transparent pricing</p></div><span className="quality-stamp">Quality<br />Assured</span></article>
-        <article className="simple-cart-card"><h3>Cart</h3><div className="simple-cart-line"><span>{activeService.title}</span><strong>₹{unitPrice}</strong></div><small>{selectedPaymentType === "cash" ? "Cash on service" : "Online payment"} · {selectedDayLabel}, {selectedTime}</small><div className="cart-quantity-row"><span>Quantity</span><div className="quantity-control compact"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div><div className="simple-savings"><BadgeCheck size={14} /> Platform protection included</div>{appliedCoupon && <div className="simple-savings coupon-saving-line"><CheckCircle2 size={14} /> Coupon saved ₹{bookingDiscount}</div>}<div className="simple-cart-total"><span>Amount to pay</span><strong>₹{bookingTotal}</strong></div><button className="btn btn-primary" type="button" onClick={() => step < 2 ? setStep(2) : step < 3 ? openPayment() : confirmBooking()} disabled={processing || isServiceDisabled || (step === 3 && !paymentMethods.length)}>{isServiceDisabled ? "Coming Soon" : step < 3 ? "Continue" : processing ? "Checking..." : "Confirm booking"}</button></article>
+        <article className="simple-cart-card"><h3>Cart</h3><div className="simple-cart-line"><span>{activeService.title}</span><strong>₹{unitPrice}</strong></div><small>{selectedPaymentType === "cash" ? "Cash on service" : "Online payment"} · {selectedDayLabel}, {selectedTime}</small><div className="cart-quantity-row"><span>Quantity</span><div className="quantity-control compact"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div><CouponApplyBox orderAmount={bookingSubtotal} user={user} appliedCoupon={appliedCoupon} onApplied={setAppliedCoupon} onRemoved={() => setAppliedCoupon(null)} onLoginRequired={() => { toast.error("Sign in before applying a coupon."); navigate("/auth"); }} className="booking-sidebar-coupon" /><div className="simple-savings"><BadgeCheck size={14} /> Platform protection included</div>{appliedCoupon && <div className="simple-savings coupon-saving-line"><CheckCircle2 size={14} /> Coupon saved ₹{bookingDiscount}</div>}<div className="simple-cart-total"><span>Amount to pay</span><strong>{appliedCoupon ? <><small>₹{bookingSubtotal}</small> ₹{bookingTotal}</> : `₹${bookingTotal}`}</strong></div><button className="btn btn-primary" type="button" onClick={() => step < 2 ? setStep(2) : step < 3 ? openPayment() : confirmBooking()} disabled={processing || isServiceDisabled || (step === 3 && !paymentMethods.length)}>{isServiceDisabled ? "Coming Soon" : step < 3 ? "Continue" : processing ? "Checking..." : "Confirm booking"}</button></article>
       </aside>
     </div>
     {confirmedBooking && (
-      <div className="booking-confirmation-backdrop" role="dialog" aria-modal="true" aria-labelledby="booking-success-title">
-        <section className="booking-confirmation-popup">
+      <div
+        className="booking-confirmation-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-success-title"
+        onClick={(event) => {
+          if (event.target === event.currentTarget) {
+            closeBookingConfirmation(event);
+          }
+        }}
+      >
+        <section className="booking-confirmation-popup" onClick={(event) => event.stopPropagation()}>
+          <button
+            className="icon-button booking-confirmation-close"
+            type="button"
+            onClick={closeBookingConfirmation}
+            aria-label="Close booking confirmation"
+          >
+            <X size={18} />
+          </button>
           <div className="success-panel booking-success-panel">
             <CheckCircle2 size={58} />
             <span className="eyebrow">Booking confirmed</span>
@@ -923,6 +961,9 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
               </span>
             </div>
             <div className="success-actions">
+              <button className="btn btn-soft" type="button" onClick={closeBookingConfirmation}>
+                Close
+              </button>
               <button className="btn btn-primary" type="button" onClick={openBookingHistory}>
                 Go to booking history <ArrowRight size={16} />
               </button>
@@ -952,16 +993,34 @@ function ContactPage() {
   const [form, setForm] = useState({ name: "", email: "", type: "General support", message: "" });
   const update = (event) => setForm({ ...form, [event.target.name]: event.target.value });
 
-  useEffect(() => onSessionChanged((nextUser) => {
-    setUser(nextUser);
-    if (!nextUser) return;
+  useEffect(() => {
+    const unsubSession = onSessionChanged((nextUser) => {
+      setUser(nextUser);
+      if (!nextUser) return;
 
-    setForm((current) => ({
-      ...current,
-      name: current.name || (isPrivilegedUser(nextUser) ? "" : displayUserName(nextUser)),
-      email: current.email || (isPrivilegedUser(nextUser) ? "" : nextUser.email) || ""
-    }));
-  }), []);
+      setForm((current) => ({
+        ...current,
+        name: current.name || (isPrivilegedUser(nextUser) ? "" : displayUserName(nextUser)),
+        email: current.email || (isPrivilegedUser(nextUser) ? "" : nextUser.email) || ""
+      }));
+    });
+
+    const unsubProfile = onProfileUpdated((nextUser) => {
+      setUser(nextUser);
+      if (!nextUser) return;
+
+      setForm((current) => ({
+        ...current,
+        name: displayUserName(nextUser),
+        email: nextUser.email || current.email
+      }));
+    });
+
+    return () => {
+      unsubSession();
+      unsubProfile();
+    };
+  }, []);
 
   const submit = async (event) => {
     event.preventDefault();

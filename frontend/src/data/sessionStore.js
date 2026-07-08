@@ -22,19 +22,37 @@ const asBackendUser = (user) =>
 
 const getBackendUser = () => (api.hasToken() ? asBackendUser(api.getSavedUser()) : null);
 const sessionChangedEvent = "funservice:session-changed";
+const profileUpdatedEvent = "funservice:profile-updated";
 
 export const onSessionChanged = (callback) => {
+  let sessionTimer;
+
   const emit = (firebaseUser = auth.currentUser) => callback(getBackendUser() || firebaseUser);
-  const onBackendSessionChanged = () => emit();
-  const unsubscribeFirebase = onAuthStateChanged(auth, emit);
+  const onBackendSessionChanged = () => {
+    clearTimeout(sessionTimer);
+    sessionTimer = setTimeout(() => emit(), 80);
+  };
+  const unsubscribeFirebase = onAuthStateChanged(auth, () => onBackendSessionChanged());
 
   emit();
   window.addEventListener(sessionChangedEvent, onBackendSessionChanged);
 
   return () => {
+    clearTimeout(sessionTimer);
     unsubscribeFirebase();
     window.removeEventListener(sessionChangedEvent, onBackendSessionChanged);
   };
+};
+
+export const onProfileUpdated = (callback) => {
+  const handler = (event) => {
+    const saved = event.detail;
+    if (!saved) return;
+    callback(asBackendUser(saved));
+  };
+
+  window.addEventListener(profileUpdatedEvent, handler);
+  return () => window.removeEventListener(profileUpdatedEvent, handler);
 };
 
 export const logoutSession = async () => {

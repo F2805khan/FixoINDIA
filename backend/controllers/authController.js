@@ -138,7 +138,14 @@ export const loginUser = asyncHandler(async (req, res) => {
 });
 
 export const getProfile = asyncHandler(async (req, res) => {
-  res.json({ user: publicUser(req.user) });
+  const user = await User.findByPk(req.user._id);
+
+  if (!user) {
+    res.status(404);
+    throw new Error("User not found");
+  }
+
+  res.json({ user: publicUser(user) });
 });
 
 export const updateProfile = asyncHandler(async (req, res) => {
@@ -150,6 +157,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
   }
 
   const { name, phone, address, email, city, latitude, longitude, subscriptionStatus } = req.body;
+  const updates = {};
 
   if (email !== undefined && email?.trim()) {
     const nextEmail = email.trim().toLowerCase();
@@ -161,16 +169,17 @@ export const updateProfile = asyncHandler(async (req, res) => {
         res.status(409);
         throw new Error("Email already in use");
       }
-      user.email = nextEmail;
+      updates.email = nextEmail;
     }
   }
 
   if (name !== undefined) {
-    user.name = String(name).trim();
-    if (!user.name) {
+    const nextName = String(name).trim();
+    if (!nextName) {
       res.status(400);
       throw new Error("Name cannot be empty");
     }
+    updates.name = nextName;
   }
 
   if (phone !== undefined && phone?.trim()) {
@@ -183,16 +192,16 @@ export const updateProfile = asyncHandler(async (req, res) => {
         res.status(409);
         throw new Error("Phone already in use");
       }
-      user.phone = nextPhone;
     }
+    updates.phone = nextPhone;
   }
 
   if (address !== undefined) {
-    user.address = address ? String(address).trim() : "";
+    updates.address = address ? String(address).trim() : "";
   }
 
   if (city !== undefined) {
-    user.city = city ? String(city).trim() : "";
+    updates.city = city ? String(city).trim() : "";
   }
 
   for (const [field, value, min, max] of [
@@ -201,7 +210,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
   ]) {
     if (value === undefined) continue;
     if (value === null || String(value).trim() === "") {
-      user[field] = null;
+      updates[field] = null;
       continue;
     }
 
@@ -210,7 +219,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
       res.status(400);
       throw new Error(`Invalid ${field}`);
     }
-    user[field] = parsed;
+    updates[field] = parsed;
   }
 
   if (subscriptionStatus !== undefined) {
@@ -218,10 +227,11 @@ export const updateProfile = asyncHandler(async (req, res) => {
       res.status(400);
       throw new Error("Invalid subscription status");
     }
-    user.subscriptionStatus = subscriptionStatus;
+    updates.subscriptionStatus = subscriptionStatus;
   }
 
-  await user.save();
+  await User.persistProfileUpdates(user, updates);
+
   res.json({ user: publicUser(user) });
 });
 

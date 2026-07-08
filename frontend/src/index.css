@@ -418,11 +418,18 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .payment-method strong { font-size: 12px; }
 .payment-method small { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .payment-empty { padding: 14px; border: 1px solid #f0c4c4; border-radius: 9px; color: #9b3030; background: #fff1f1; font-size: 12px; }
-.coupon-apply-box { display: grid; gap: 8px; margin: 4px 0 14px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: #ffffff; }
-.coupon-apply-box label { margin: 0; }
-.coupon-input-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; }
-.coupon-input-row .btn { min-height: 42px; white-space: nowrap; }
-.coupon-success, .coupon-error { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 11px; font-weight: 800; }
+.coupon-apply-box { display: grid; gap: 10px; margin: 12px 0 0; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: #ffffff; }
+.coupon-apply-box.has-error { border-color: #f3c0c0; background: #fffafa; }
+.coupon-field-label { margin: 0; font-size: 11px; font-weight: 800; color: var(--secondary); letter-spacing: .2px; }
+.coupon-code-input { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: #fff; font-size: 13px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; }
+.coupon-code-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(146,184,30,.16); }
+.coupon-code-input:disabled { background: var(--raised); color: var(--accent-ink); cursor: not-allowed; }
+.coupon-apply-box.has-error .coupon-code-input { border-color: #e08b8b; }
+.coupon-action-buttons { display: grid; gap: 8px; }
+.coupon-action-buttons.is-single { grid-template-columns: 1fr; }
+.coupon-action-buttons.is-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.coupon-action-buttons .btn { width: 100%; min-height: 40px; justify-content: center; padding-inline: 10px; }
+.coupon-success, .coupon-error { display: flex; align-items: flex-start; gap: 7px; margin: 0; font-size: 11px; font-weight: 800; line-height: 1.45; }
 .coupon-success { color: var(--accent-ink); }
 .coupon-error { color: #b42323; }
 .review-box { display: flex; justify-content: space-between; margin-top: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; color: var(--secondary); font-size: 12px; background: #ffffff; }
@@ -443,6 +450,8 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .done-icon { width: 74px; height: 74px; display: grid; place-items: center; margin-bottom: 18px; color: #111; border-radius: 50%; background: var(--accent); box-shadow: 0 0 36px rgba(5,150,105,.18); }
 .modal-backdrop, .booking-confirmation-backdrop { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 20px; overflow-y: auto; background: rgba(31,37,18,.46); backdrop-filter: blur(10px); animation: modal-fade .18s ease both; }
 .booking-modal, .status-modal, .booking-confirmation-popup { width: min(560px,100%); max-height: calc(100vh - 40px); overflow-y: auto; padding: 26px; border: 1px solid var(--accent-border); border-radius: 20px; background: rgba(255,254,250,.98); box-shadow: 0 28px 90px rgba(52,67,20,.22); animation: modal-pop .22s cubic-bezier(.2,.8,.2,1) both; }
+.booking-confirmation-popup { position: relative; }
+.booking-confirmation-close { position: absolute; top: 14px; right: 14px; z-index: 2; }
 .booking-modal { width: min(720px,100%); }
 .status-modal { width: min(620px,100%); }
 .modal-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
@@ -547,6 +556,25 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .cart-total-card { position: sticky; top: 92px; padding: 22px; }
 .cart-total-card strong { display: block; margin: 10px 0 8px; font-size: 42px; letter-spacing: -2px; }
 .cart-total-card p { margin: 0; font-size: 12px; }
+.cart-summary-line { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin: 8px 0; font-size: 13px; font-weight: 700; }
+.cart-summary-line strong { margin: 0; font-size: 16px; letter-spacing: 0; }
+.cart-summary-discount strong { color: var(--accent-ink); }
+.cart-summary-total { display: flex; justify-content: space-between; gap: 12px; align-items: end; margin: 12px 0 16px; padding-top: 12px; border-top: 1px solid var(--border); font-weight: 900; }
+.cart-summary-total strong { margin: 0; font-size: 34px; letter-spacing: -1px; line-height: 1; }
+.cart-summary-total strong small { display: block; font-size: 13px; color: var(--muted); text-decoration: line-through; font-weight: 700; }
+.cart-coupon-box { margin-top: 14px; }
+.booking-sidebar-coupon {
+  margin: 14px 0 0;
+  padding: 0;
+  border: none;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  padding-top: 14px;
+}
+.booking-sidebar-coupon .coupon-field-label { font-size: 10px; text-transform: uppercase; letter-spacing: .45px; color: var(--muted); }
+.booking-sidebar-coupon .coupon-code-input { min-height: 38px; font-size: 12px; }
+.booking-sidebar-coupon .coupon-action-buttons .btn { min-height: 36px; font-size: 11px; }
 .cart-empty { min-height: 360px; display: grid; place-items: center; align-content: center; justify-items: center; gap: 12px; text-align: center; }
 .cart-empty svg { color: var(--accent-ink); }
 .cart-empty h2 { margin: 0; font-size: 32px; letter-spacing: -1.5px; }
@@ -711,6 +739,7 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .profile-address-card span { display: flex; align-items: center; gap: 5px; margin-top: 14px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .7px; text-transform: uppercase; }
 .profile-address-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .profile-address-head .btn { margin-top: 14px; }
+.profile-section-edit-btn { position: relative; z-index: 2; flex-shrink: 0; }
 .profile-address-card h3, .profile-subscription-card h3 { margin: 8px 0 4px; font-size: 19px; letter-spacing: -.8px; }
 .profile-address-card p, .profile-subscription-card p { margin: 0; font-size: 12px; }
 .profile-address-card small { display: block; margin-top: 8px; color: var(--muted); font-size: 9px; }
@@ -1024,7 +1053,6 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
   .booking-steps { overflow-x: auto; }
   .date-row { overflow-x: auto; grid-template-columns: repeat(6,62px); }
   .time-grid { grid-template-columns: repeat(2,1fr); }
-  .coupon-input-row { grid-template-columns: 1fr; }
   .auth-page { min-height: auto; gap: 14px; padding: 36px 0 74px; }
   .auth-stage { padding: 10px; border-radius: 22px; }
   .auth-card { padding: 22px; border-radius: 18px; }

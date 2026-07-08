@@ -6,6 +6,7 @@ const legacyBrandPrefix = ["quick", "fix"].join("");
 const LEGACY_TOKEN_KEY = `${legacyBrandPrefix}_token`;
 const LEGACY_USER_KEY = `${legacyBrandPrefix}_user`;
 const SESSION_CHANGED_EVENT = "funservice:session-changed";
+const PROFILE_UPDATED_EVENT = "funservice:profile-updated";
 
 const bookingPath = (id) => `/bookings/${encodeURIComponent(id)}`;
 const paymentPath = (bookingId) => `/payment/${encodeURIComponent(bookingId)}`;
@@ -58,6 +59,15 @@ const saveSession = ({ token, user }) => {
   window.dispatchEvent(new Event(SESSION_CHANGED_EVENT));
 };
 
+const updateSavedUser = (partial = {}) => {
+  const current = readSavedUser();
+  if (!current) return null;
+  const next = { ...current, ...partial };
+  localStorage.setItem(USER_KEY, JSON.stringify(next));
+  window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT, { detail: next }));
+  return next;
+};
+
 const clearSession = () => {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
@@ -81,6 +91,7 @@ export const api = {
   getToken: () => localStorage.getItem(TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY),
   getSavedUser: readSavedUser,
   saveSession,
+  updateSavedUser,
   clearSession,
   isAdmin: () => readSavedUser()?.role === "admin" || readSavedUser()?.role === "owner",
   isOwner: () => readSavedUser()?.role === "owner",
