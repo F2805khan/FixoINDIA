@@ -1,12 +1,11 @@
 import "./config/env.js";
 import cors from "cors";
 import express from "express";
-import sequelize from "./config/sequelize.js";
-import connectDB from "./config/db.js";
 import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
+import couponRoutes from "./routes/couponRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
@@ -39,21 +38,17 @@ app.get("/", (req, res) => {
 });
 
 app.get("/api/health", async (req, res) => {
-  try {
-    await sequelize.authenticate();
-    res.json({
-      ok: true,
-      database: "connected",
-      emailDelivery: isEmailDeliveryConfigured() ? "configured" : "not-configured"
-    });
-  } catch (error) {
-    res.status(503).json({ ok: false, database: "error", message: error.message });
-  }
+  res.json({
+    ok: true,
+    database: "supabase",
+    emailDelivery: isEmailDeliveryConfigured() ? "configured" : "not-configured"
+  });
 });
 
 app.use("/api/auth", authRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/bookings", bookingRoutes);
+app.use("/api/coupons", couponRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/support", supportRoutes);
@@ -68,7 +63,6 @@ app.use(errorHandler);
 const PORT = process.env.PORT || 5000;
 
 const start = async () => {
-  await connectDB();
   await ensureAdminUser();
   if (!isEmailDeliveryConfigured()) {
     console.warn("Resend email delivery is disabled. Set RESEND_API_KEY in backend/.env and restart the backend.");

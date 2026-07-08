@@ -17,6 +17,7 @@ import {
   updatePaymentMethods,
   exportAcceptedBookingsExcel
 } from "../controllers/adminController.js";
+import { createCoupon, deleteCoupon, getCoupons, updateCoupon } from "../controllers/couponController.js";
 import { cancelBooking, assignProfessional, updateBookingStatus } from "../controllers/bookingController.js";
 import {
   createService,
@@ -49,6 +50,10 @@ router.put("/users/:id/password", resetUserPassword);
 router.get("/payments", getPayments);
 router.get("/payment-methods", getPaymentMethods);
 router.put("/payment-methods", updatePaymentMethods);
+router.get("/coupons", getCoupons);
+router.post("/coupons", createCoupon);
+router.put("/coupons/:id", updateCoupon);
+router.delete("/coupons/:id", deleteCoupon);
 router.get("/support", getSupportInbox);
 router.put("/support/:id/reply", replyToSupportMessage);
 

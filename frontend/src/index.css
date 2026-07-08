@@ -418,8 +418,16 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .payment-method strong { font-size: 12px; }
 .payment-method small { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .payment-empty { padding: 14px; border: 1px solid #f0c4c4; border-radius: 9px; color: #9b3030; background: #fff1f1; font-size: 12px; }
+.coupon-apply-box { display: grid; gap: 8px; margin: 4px 0 14px; padding: 14px; border: 1px solid var(--border); border-radius: 12px; background: #ffffff; }
+.coupon-apply-box label { margin: 0; }
+.coupon-input-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; }
+.coupon-input-row .btn { min-height: 42px; white-space: nowrap; }
+.coupon-success, .coupon-error { display: flex; align-items: center; gap: 7px; margin: 0; font-size: 11px; font-weight: 800; }
+.coupon-success { color: var(--accent-ink); }
+.coupon-error { color: #b42323; }
 .review-box { display: flex; justify-content: space-between; margin-top: 12px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; color: var(--secondary); font-size: 12px; background: #ffffff; }
 .review-box strong { color: var(--accent-ink); }
+.review-box strong small { margin-right: 7px; color: var(--muted); font-size: 11px; text-decoration: line-through; }
 .booking-quantity-box { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 0 0 16px; padding: 15px; border: 1px solid var(--accent-border); border-radius: 12px; background: var(--accent-soft); }
 .booking-quantity-box span, .cart-quantity-row span { display: block; color: var(--muted); font-size: 9px; font-weight: 900; letter-spacing: .7px; text-transform: uppercase; }
 .booking-quantity-box strong { display: block; margin-top: 4px; font-size: 16px; }
@@ -443,6 +451,11 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .booking-confirmation-popup .eyebrow { display: block; margin-top: 4px; text-align: center; }
 .booking-confirmation-popup h2 { margin: 14px 0 8px; font-size: 30px; letter-spacing: -2px; }
 .booking-confirmation-popup p { margin: 0; font-size: 12px; line-height: 1.7; }
+.booking-success-panel .success-actions { justify-content: center; width: 100%; }
+.booking-success-details { width: 100%; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 9px; margin-top: 6px; text-align: left; }
+.booking-success-details span { min-width: 0; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--raised); }
+.booking-success-details small { display: block; margin-bottom: 5px; color: var(--muted); font-size: 9px; font-weight: 900; letter-spacing: .5px; text-transform: uppercase; }
+.booking-success-details strong { display: block; color: var(--text); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
 .notification-trigger { position: relative; z-index: 90; }
 .notification-button { position: relative; }
 .notification-dot { position: absolute; top: 8px; right: 8px; width: 8px; height: 8px; border: 2px solid #ffffff; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
@@ -512,6 +525,7 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .quantity-control.compact button { width: 32px; height: 32px; }
 .quantity-control.compact b { min-width: 28px; }
 .simple-savings { display: flex; align-items: center; gap: 8px; margin: 18px -24px; padding: 11px 24px; color: var(--accent-ink); background: var(--accent-soft); font-size: 12px; font-weight: 800; }
+.coupon-saving-line { margin-top: -18px; border-top: 1px solid rgba(146,184,30,.24); }
 .simple-cart-total { margin-bottom: 18px; font-size: 14px; font-weight: 900; }
 .simple-cart-total strong { font-size: 24px; letter-spacing: -1px; }
 .simple-cart-card .btn { width: 100%; }
@@ -1010,6 +1024,7 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
   .booking-steps { overflow-x: auto; }
   .date-row { overflow-x: auto; grid-template-columns: repeat(6,62px); }
   .time-grid { grid-template-columns: repeat(2,1fr); }
+  .coupon-input-row { grid-template-columns: 1fr; }
   .auth-page { min-height: auto; gap: 14px; padding: 36px 0 74px; }
   .auth-stage { padding: 10px; border-radius: 22px; }
   .auth-card { padding: 22px; border-radius: 18px; }
@@ -1043,6 +1058,7 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
   .profile-section-layout { grid-template-columns: 1fr; }
   .profile-section-nav { grid-template-columns: repeat(2,1fr); }
   .payment-method-grid { grid-template-columns: 1fr; }
+  .booking-success-details { grid-template-columns: 1fr; }
   .booking-modal, .status-modal, .booking-confirmation-popup { padding: 18px; border-radius: 16px; }
   .modal-head { align-items: center; }
   .notification-popup { right: -6px; width: min(350px,calc(100vw - 24px)); max-height: 320px; }
@@ -1310,6 +1326,13 @@ input:required:placeholder-shown:focus, textarea:required:placeholder-shown:focu
 .payment-setting strong { color: var(--text); font-size: 12px; }
 .payment-setting span { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.45; }
 .payment-setting input { width: auto; flex-shrink: 0; accent-color: var(--accent); }
+
+.coupon-settings-panel { margin: 14px 0; }
+.coupon-settings-form { margin-top: 0; }
+.coupon-form-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.coupon-settings-table { min-width: 900px; }
+.coupon-code-badge { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; letter-spacing: .4px; }
+.coupon-row-actions { display: flex; align-items: center; gap: 8px; }
 
 .ml-program-panel { margin: 14px 0; overflow: hidden; background: radial-gradient(circle at 100% 0, rgba(146,184,30,.14), transparent 32%), var(--surface); }
 .ml-program-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }

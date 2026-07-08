@@ -1,38 +1,18 @@
-import { DataTypes, Model } from "sequelize";
-import sequelize from "../config/sequelize.js";
+import { SupabaseModel } from "./SupabaseModel.js";
 
-class AuthEvent extends Model {}
-
-AuthEvent.init(
-  {
-    _id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    userId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "users", key: "_id" }
-    },
-    eventType: {
-      type: DataTypes.ENUM("signup", "login", "password-reset"),
-      allowNull: false
-    },
-    provider: {
-      type: DataTypes.ENUM("password", "otp", "google"),
-      allowNull: false
-    },
-    email: { type: DataTypes.STRING, allowNull: true },
-    ipAddress: { type: DataTypes.STRING, allowNull: true },
-    userAgent: { type: DataTypes.STRING(500), allowNull: true }
-  },
-  {
-    sequelize,
-    modelName: "AuthEvent",
-    tableName: "auth_events",
-    updatedAt: false
+class AuthEvent extends SupabaseModel {
+  static get tableName() {
+    return "auth_events";
   }
-);
+
+  static get columnMap() {
+    return {
+      userId: "user_id",
+      eventType: "event_type",
+      ipAddress: "ip_address",
+      userAgent: "user_agent"
+    };
+  }
+}
 
 export default AuthEvent;

@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op } from "./sequelizeMock.js";
 
 export default function buildIdentityWhere({ email, phone, userId, identifier }) {
   const parts = [];

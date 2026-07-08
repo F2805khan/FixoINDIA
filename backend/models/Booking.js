@@ -1,5 +1,4 @@
-import { DataTypes, Model } from "sequelize";
-import sequelize from "../config/sequelize.js";
+import { SupabaseModel } from "./SupabaseModel.js";
 
 export const bookingStatuses = [
   "Confirmed",
@@ -10,60 +9,38 @@ export const bookingStatuses = [
   "Cancelled"
 ];
 
-class Booking extends Model {}
-
-Booking.init(
-  {
-    _id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    userId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "users", key: "_id" }
-    },
-    serviceId: {
-      type: DataTypes.UUID,
-      allowNull: true,
-      references: { model: "services", key: "_id" }
-    },
-    bookingId: { type: DataTypes.STRING, allowNull: false, unique: true },
-    serviceName: { type: DataTypes.STRING, allowNull: false },
-    salonName: { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
-    customerName: { type: DataTypes.STRING, allowNull: false },
-    phone: { type: DataTypes.STRING, allowNull: false },
-    address: { type: DataTypes.STRING, allowNull: false },
-    date: { type: DataTypes.STRING, allowNull: false },
-    time: { type: DataTypes.STRING, allowNull: false },
-    amount: { type: DataTypes.DOUBLE, allowNull: false },
-    paymentMethod: {
-      type: DataTypes.ENUM("UPI", "Debit/Credit Card", "Net Banking", "Cash on Service", "Wallet"),
-      defaultValue: "UPI"
-    },
-    paymentStatus: {
-      type: DataTypes.ENUM("Pending", "Paid", "Failed", "Refunded"),
-      defaultValue: "Pending"
-    },
-    bookingStatus: {
-      type: DataTypes.ENUM(...bookingStatuses),
-      defaultValue: "Confirmed"
-    },
-    professionalName: { type: DataTypes.STRING, defaultValue: "Ramesh Kumar" },
-    professionalPhone: { type: DataTypes.STRING, defaultValue: "99988877766" },
-    professionalPhoto: {
-      type: DataTypes.STRING,
-      defaultValue:
-        "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=180&q=80"
-    },
-    estimatedArrival: { type: DataTypes.STRING, defaultValue: "12 minutes" }
-  },
-  {
-    sequelize,
-    modelName: "Booking",
-    tableName: "bookings"
+class Booking extends SupabaseModel {
+  static get tableName() {
+    return "bookings";
   }
-);
+
+  /**
+   * Map app-code column names → original DB column names.
+   */
+  static get columnMap() {
+    return {
+      bookingId: "booking_number",
+      userId: "user_id",
+      serviceId: "service_id",
+      serviceName: "service_name",
+      customerName: "customer_name",
+      phone: "customer_phone",
+      address: "customer_address",
+      date: "booking_date",
+      time: "booking_time",
+      subtotalAmount: "subtotal_amount",
+      discountAmount: "discount_amount",
+      couponCode: "coupon_code",
+      paymentMethod: "payment_method",
+      paymentStatus: "payment_status",
+      bookingStatus: "booking_status",
+      professionalName: "technician_name",
+      professionalPhoto: "technician_image",
+      estimatedArrival: "estimated_arrival",
+      salonName: "vendor_name",
+      professionalPhone: "vendor_phone"
+    };
+  }
+}
 
 export default Booking;

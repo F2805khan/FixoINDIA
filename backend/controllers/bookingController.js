@@ -7,6 +7,7 @@ import generateBookingId from "../utils/generateBookingId.js";
 import { notifyWhatsAppAgent } from "../utils/whatsappAgent.js";
 import { assertPaymentMethodEnabled } from "../utils/paymentMethods.js";
 import { updateAcceptedBookingsCSV } from "../utils/excelExporter.js";
+import { incrementCouponUsage, normalizeCouponCode, validateCouponForAmount } from "../utils/coupons.js";
 
 
 const UUID_RE =
@@ -41,21 +42,37 @@ export const createBooking = asyncHandler(async (req, res) => {
     req.body.serviceId && UUID_RE.test(String(req.body.serviceId))
       ? await Service.findByPk(req.body.serviceId)
       : null;
-  const amount = parseAmount(req.body.amount ?? service?.price);
+  const subtotalAmount = parseAmount(req.body.subtotalAmount ?? req.body.originalAmount ?? req.body.amount ?? service?.price);
+  const requestedAmount = parseAmount(req.body.amount ?? subtotalAmount);
   const paymentMethod = req.body.paymentMethod || "UPI";
   const paymentStatus = req.body.paymentStatus || "Pending";
   const serviceName = req.body.serviceName || service?.title;
   const customerName = req.body.customerName || req.user.name;
   const phone = req.body.phone || req.user.phone;
+  const couponCode = normalizeCouponCode(req.body.couponCode);
+  let amount = Number.isFinite(requestedAmount) ? requestedAmount : subtotalAmount;
+  let discountAmount = 0;
+  let couponResult = null;
 
   if (!serviceName || !customerName || !phone || !req.body.address || !req.body.date || !req.body.time) {
     res.status(400);
     throw new Error("Service, customer name, phone, address, date, and time are required");
   }
 
-  if (!Number.isFinite(amount) || amount <= 0) {
+  if (!Number.isFinite(subtotalAmount) || subtotalAmount <= 0) {
     res.status(400);
     throw new Error("A valid booking amount is required");
+  }
+
+  if (couponCode) {
+    couponResult = await validateCouponForAmount(couponCode, subtotalAmount);
+    amount = couponResult.finalAmount;
+    discountAmount = couponResult.discountAmount;
+  }
+
+  if (!Number.isFinite(amount) || amount < 0) {
+    res.status(400);
+    throw new Error("A valid final booking amount is required");
   }
 
   await assertPaymentMethodEnabled(paymentMethod);
@@ -76,6 +93,9 @@ export const createBooking = asyncHandler(async (req, res) => {
     address: req.body.address,
     date: req.body.date,
     time: req.body.time,
+    subtotalAmount,
+    discountAmount,
+    couponCode: couponResult?.code || "",
     amount,
     paymentMethod,
     paymentStatus,
@@ -93,6 +113,10 @@ export const createBooking = asyncHandler(async (req, res) => {
       status: "Paid",
       transactionId: `txn_${Date.now()}`
     });
+  }
+
+  if (couponResult) {
+    await incrementCouponUsage(couponResult.coupon);
   }
 
   let whatsappAgent;

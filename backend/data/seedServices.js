@@ -1,5 +1,4 @@
 import "../config/env.js";
-import connectDB from "../config/db.js";
 import Service from "../models/Service.js";
 
 const services = [
@@ -123,7 +122,6 @@ const services = [
 ];
 
 const seed = async () => {
-  await connectDB();
   await Service.destroy({ where: {} });
   await Service.bulkCreate(services);
   console.log("FunService services seeded");

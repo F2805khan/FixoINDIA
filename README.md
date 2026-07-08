@@ -1,6 +1,6 @@
 # FunService
 
-FunService is a full-stack home services marketplace built with React.js, Node.js, Express.js, and MySQL.
+FunService is a full-stack home services marketplace built with React.js, Node.js, Express.js, and Supabase PostgreSQL.
 
 Tagline: **All Services. One Click.**
 
@@ -8,7 +8,7 @@ Tagline: **All Services. One Click.**
 
 - Responsive React frontend with modern white and blue service marketplace UI
 - Service search, category filtering, booking modal, payment options, booking timeline, history, support chat, FAQ, and login/signup screens
-- Express REST API with JWT auth, bcrypt password hashing, MongoDB/Mongoose models, services, bookings, payments, support messages, and admin routes
+- Express REST API with JWT auth, bcrypt password hashing, Supabase-backed models, services, bookings, payments, support messages, and admin routes
 - Dummy Razorpay-style payment flow and optional WhatsApp agent webhook simulation
 
 ## Setup
@@ -25,7 +25,7 @@ npm run install:all
 cp backend/.env.example backend/.env
 ```
 
-Update the MySQL settings and `JWT_SECRET` in `backend/.env`. To send OTP and
+Update the Supabase settings and `JWT_SECRET` in `backend/.env`. To send OTP and
 support emails, also set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and
 `RESEND_SUPPORT_TO`.
 
@@ -58,7 +58,7 @@ admin backend: 'http://localhost:5173/backend'
 
 ## Seed Services
 
-After configuring MongoDB:
+After configuring Supabase:
 
 ```bash
 npm run seed --prefix backend
@@ -69,6 +69,6 @@ Keep database credentials in `backend/.env` only. Do not commit real usernames,
 passwords, tokens, or API keys to GitHub.
 
 ```bash
-MYSQL_USER=your-database-user
-MYSQL_PASSWORD=your-database-password
+SUPABASE_URL=your-supabase-project-url
+SUPABASE_SERVICE_ROLE_KEY=your-backend-only-service-role-key
 ```

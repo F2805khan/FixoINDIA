@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import { randomInt } from "node:crypto";
-import { Op } from "sequelize";
+import { Op } from "../utils/sequelizeMock.js";
 import asyncHandler from "../middleware/asyncHandler.js";
 import User from "../models/User.js";
 import buildIdentityWhere from "../utils/buildIdentityWhere.js";

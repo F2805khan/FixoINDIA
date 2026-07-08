@@ -1,78 +1,52 @@
 import bcrypt from "bcryptjs";
-import { DataTypes, Model } from "sequelize";
-import sequelize from "../config/sequelize.js";
+import { SupabaseModel } from "./SupabaseModel.js";
 
-class User extends Model {
+class User extends SupabaseModel {
+  static get tableName() {
+    return "users";
+  }
+
+  /**
+   * Map app-code column names → original DB column names.
+   * The users table was created with snake_case columns originally.
+   * Our migration added camelCase duplicates, but the originals
+   * have NOT NULL constraints and existing data — so we map to them.
+   */
+  static get columnMap() {
+    return {
+      name: "full_name",
+      userId: "username",
+      authProvider: "provider",
+      googleId: "firebase_uid",
+      otpCode: "otp",
+      otpExpires: "otp_expiry",
+      subscriptionStatus: "status"
+    };
+  }
+
   async matchPassword(enteredPassword) {
     if (!this.password) return false;
     return bcrypt.compare(enteredPassword, this.password);
   }
-}
 
-User.init(
-  {
-    _id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true
-    },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: false
-    },
-    email: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      unique: true
-    },
-    phone: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      unique: true
-    },
-    userId: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      unique: true
-    },
-    password: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    address: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      defaultValue: ""
-    },
-    city: { type: DataTypes.STRING, allowNull: true, defaultValue: "" },
-    latitude: { type: DataTypes.DECIMAL(10, 7), allowNull: true },
-    longitude: { type: DataTypes.DECIMAL(10, 7), allowNull: true },
-    subscriptionStatus: { type: DataTypes.STRING, allowNull: false, defaultValue: "active" },
-    role: {
-      type: DataTypes.ENUM("user", "admin", "owner"),
-      defaultValue: "user"
-    },
-    authProvider: {
-      type: DataTypes.ENUM("password", "otp", "google"),
-      defaultValue: "password"
-    },
-    googleId: { type: DataTypes.STRING, allowNull: true },
-    otpCode: { type: DataTypes.STRING, allowNull: true },
-    otpExpires: { type: DataTypes.DATE, allowNull: true }
-  },
-  {
-    sequelize,
-    modelName: "User",
-    tableName: "users",
-    hooks: {
-      beforeSave: async (user) => {
-        if (user.changed("password") && user.password) {
-          const salt = await bcrypt.genSalt(10);
-          user.password = await bcrypt.hash(user.password, salt);
-        }
-      }
-    }
+  static async hashPassword(password) {
+    const salt = await bcrypt.genSalt(10);
+    return bcrypt.hash(password, salt);
   }
-);
+
+  static async create(data) {
+    if (data.password) {
+      data.password = await this.hashPassword(data.password);
+    }
+    return super.create(data);
+  }
+
+  async save() {
+    if (this.password && !this.password.startsWith("$2a$") && !this.password.startsWith("$2b$")) {
+      this.password = await User.hashPassword(this.password);
+    }
+    return super.save();
+  }
+}
 
 export default User;

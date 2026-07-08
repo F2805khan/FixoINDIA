@@ -17,5 +17,7 @@ services:
         value: 30d
       - key: ALLOW_DEMO_GOOGLE_AUTH
         value: "true"
-      - key: MYSQL_URL
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false

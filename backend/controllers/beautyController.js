@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op } from "../utils/sequelizeMock.js";
 import asyncHandler from "../middleware/asyncHandler.js";
 import BeautyArtist from "../models/BeautyArtist.js";
 

@@ -1,6 +1,6 @@
-import { Op } from "sequelize";
+import { Op } from "../utils/sequelizeMock.js";
 import asyncHandler from "../middleware/asyncHandler.js";
-import sequelize from "../config/sequelize.js";
+import { supabase } from "../config/supabase.js";
 import Service from "../models/Service.js";
 
 const serviceFields = ["title", "description", "category", "price", "duration", "image", "rating", "region", "enabled"];
@@ -49,19 +49,24 @@ const normalizeServicePayload = (body, { partial = false } = {}) => {
 };
 
 export const getServiceCategories = asyncHandler(async (req, res) => {
-  const rows = await Service.findAll({
-    attributes: ["category", [sequelize.fn("COUNT", sequelize.col("_id")), "count"]],
-    where: {
-      category: {
-        [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: "" }]
-      }
-    },
-    group: ["category"],
-    order: [["category", "ASC"]],
-    raw: true
-  });
+  const { data, error } = await supabase
+    .from("services")
+    .select("category")
+    .not("category", "is", null)
+    .neq("category", "");
 
-  res.json(rows.map((row) => ({ name: row.category, count: Number(row.count) })));
+  if (error) throw error;
+
+  const counts = {};
+  for (const row of data) {
+    counts[row.category] = (counts[row.category] || 0) + 1;
+  }
+
+  const rows = Object.entries(counts)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  res.json(rows);
 });
 
 export const getServices = asyncHandler(async (req, res) => {

@@ -605,6 +605,11 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
   const [bookingTouched, setBookingTouched] = useState({});
   const [bookingSubmitted, setBookingSubmitted] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [confirmedBooking, setConfirmedBooking] = useState(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponApplying, setCouponApplying] = useState(false);
+  const [couponError, setCouponError] = useState("");
   const Icon = activeService.icon;
 
   const paymentIcons = {
@@ -615,9 +620,15 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
     "Cash on Service": Banknote
   };
   const unitPrice = Number(activeService.price) || 0;
-  const bookingTotal = unitPrice * quantity;
+  const bookingSubtotal = unitPrice * quantity;
+  const bookingDiscount = Number(appliedCoupon?.discountAmount) || 0;
+  const bookingTotal = appliedCoupon ? Number(appliedCoupon.finalAmount) : bookingSubtotal;
   const updateQuantity = (nextQuantity) => {
     const safeQuantity = Math.max(1, Math.min(10, nextQuantity));
+    if (safeQuantity !== quantity) {
+      setAppliedCoupon(null);
+      setCouponError("");
+    }
     setQuantity(safeQuantity);
     if (cartItem) onUpdateCartQuantity?.(cartItem.id, safeQuantity);
   };
@@ -702,6 +713,39 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
     setStep(2);
   };
 
+  const applyCoupon = async () => {
+    const code = couponCode.trim();
+    if (!code) {
+      setCouponError("Enter a coupon code.");
+      return;
+    }
+
+    if (!user) {
+      toast.error("Sign in before applying a coupon.");
+      navigate("/auth");
+      return;
+    }
+
+    setCouponApplying(true);
+    setCouponError("");
+    try {
+      const result = await api.applyCoupon({ code, orderAmount: bookingSubtotal });
+      setAppliedCoupon(result);
+      setCouponCode(result.code);
+      toast.success(`Coupon ${result.code} applied.`);
+    } catch (error) {
+      setAppliedCoupon(null);
+      setCouponError(error.message || "Coupon could not be applied.");
+    } finally {
+      setCouponApplying(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError("");
+  };
+
   const confirmBooking = async () => {
     if (!user) {
       toast.error("Sign in before confirming your booking.");
@@ -744,21 +788,29 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
         address: customer.address.trim(),
         date: bookingDays.find((day) => day.key === selectedDate)?.label || selectedDate,
         time: selectedTime,
+        subtotalAmount: bookingSubtotal,
         amount: bookingTotal,
         salonName: activeService.salonName || "",
+        couponCode: appliedCoupon?.code || "",
         paymentMethod,
         paymentStatus
       });
+      setConfirmedBooking(booking);
       toast.success(
-        paymentStatus === "Paid" ? "Payment complete. Opening booking history." : "Booking confirmed. Opening booking history."
+        paymentStatus === "Paid" ? "Payment complete. Booking confirmed." : "Booking confirmed."
       );
-      navigate(`/`);
     } catch (error) {
       toast.error(error.message || "Could not confirm your booking.");
     } finally {
       setProcessing(false);
     }
   };
+
+  const openBookingHistory = () => {
+    if (!confirmedBooking) return;
+    navigate("/profile?tab=history", { state: { freshBooking: confirmedBooking } });
+  };
+
   const selectedPaymentType = paymentMethods.find(({ method }) => method === paymentMethod)?.type;
   const isCashBooking = selectedPaymentType === "cash";
   const noPaymentMethods = paymentMethods.length === 0;
@@ -812,15 +864,73 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
                 );
               })}
             </div>
-            {!paymentMethods.length && <p className="payment-empty">No payment method is available right now. Please contact support.</p>}<div className="review-box"><span>{selectedDayLabel} at {selectedTime} · Qty {quantity}</span><strong>₹{bookingTotal}</strong></div><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button><button className="btn btn-primary" onClick={confirmBooking} disabled={processing || !paymentMethods.length}>{processing ? "Checking payment status..." : paymentMethods.find(({ method }) => method === paymentMethod)?.type === "cash" ? "Confirm cash booking" : "Pay and confirm"} {!processing && <ArrowRight size={16} />}</button></div></div>}
+            <div className="coupon-apply-box">
+              <label>
+                <span>Coupon code</span>
+                <div className="coupon-input-row">
+                  <input value={couponCode} onChange={(event) => { setCouponCode(event.target.value.toUpperCase()); setCouponError(""); }} placeholder="SAVE100" disabled={couponApplying || Boolean(appliedCoupon)} />
+                  {appliedCoupon ? (
+                    <button className="btn btn-ghost btn-small" type="button" onClick={removeCoupon}>Remove</button>
+                  ) : (
+                    <button className="btn btn-primary btn-small" type="button" onClick={applyCoupon} disabled={couponApplying}>
+                      {couponApplying ? "Applying..." : "Apply"}
+                    </button>
+                  )}
+                </div>
+              </label>
+              {appliedCoupon && <p className="coupon-success"><CheckCircle2 size={14} /> {appliedCoupon.code} applied. You saved ₹{bookingDiscount}.</p>}
+              {couponError && <p className="coupon-error">{couponError}</p>}
+            </div>
+            {!paymentMethods.length && <p className="payment-empty">No payment method is available right now. Please contact support.</p>}<div className="review-box"><span>{selectedDayLabel} at {selectedTime} · Qty {quantity}{appliedCoupon ? ` · Coupon ${appliedCoupon.code}` : ""}</span><strong>{appliedCoupon ? <><small>₹{bookingSubtotal}</small> ₹{bookingTotal}</> : `₹${bookingTotal}`}</strong></div><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button><button className="btn btn-primary" onClick={confirmBooking} disabled={processing || !paymentMethods.length}>{processing ? "Checking payment status..." : paymentMethods.find(({ method }) => method === paymentMethod)?.type === "cash" ? "Confirm cash booking" : "Pay and confirm"} {!processing && <ArrowRight size={16} />}</button></div></div>}
         </>
       )}
       </section>
       <aside className="simple-cart-column">
         <article className="simple-promise-card"><div><h3>Fun Promise</h3><p><Check size={15} /> Verified professionals</p><p><Check size={15} /> Hassle-free booking</p><p><Check size={15} /> Transparent pricing</p></div><span className="quality-stamp">Quality<br />Assured</span></article>
-        <article className="simple-cart-card"><h3>Cart</h3><div className="simple-cart-line"><span>{activeService.title}</span><strong>₹{unitPrice}</strong></div><small>{selectedPaymentType === "cash" ? "Cash on service" : "Online payment"} · {selectedDayLabel}, {selectedTime}</small><div className="cart-quantity-row"><span>Quantity</span><div className="quantity-control compact"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div><div className="simple-savings"><BadgeCheck size={14} /> Platform protection included</div><div className="simple-cart-total"><span>Amount to pay</span><strong>₹{bookingTotal}</strong></div><button className="btn btn-primary" type="button" onClick={() => step < 2 ? setStep(2) : step < 3 ? openPayment() : confirmBooking()} disabled={processing || isServiceDisabled || (step === 3 && !paymentMethods.length)}>{isServiceDisabled ? "Coming Soon" : step < 3 ? "Continue" : processing ? "Checking..." : "Confirm booking"}</button></article>
+        <article className="simple-cart-card"><h3>Cart</h3><div className="simple-cart-line"><span>{activeService.title}</span><strong>₹{unitPrice}</strong></div><small>{selectedPaymentType === "cash" ? "Cash on service" : "Online payment"} · {selectedDayLabel}, {selectedTime}</small><div className="cart-quantity-row"><span>Quantity</span><div className="quantity-control compact"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div><div className="simple-savings"><BadgeCheck size={14} /> Platform protection included</div>{appliedCoupon && <div className="simple-savings coupon-saving-line"><CheckCircle2 size={14} /> Coupon saved ₹{bookingDiscount}</div>}<div className="simple-cart-total"><span>Amount to pay</span><strong>₹{bookingTotal}</strong></div><button className="btn btn-primary" type="button" onClick={() => step < 2 ? setStep(2) : step < 3 ? openPayment() : confirmBooking()} disabled={processing || isServiceDisabled || (step === 3 && !paymentMethods.length)}>{isServiceDisabled ? "Coming Soon" : step < 3 ? "Continue" : processing ? "Checking..." : "Confirm booking"}</button></article>
       </aside>
     </div>
+    {confirmedBooking && (
+      <div className="booking-confirmation-backdrop" role="dialog" aria-modal="true" aria-labelledby="booking-success-title">
+        <section className="booking-confirmation-popup">
+          <div className="success-panel booking-success-panel">
+            <CheckCircle2 size={58} />
+            <span className="eyebrow">Booking confirmed</span>
+            <h2 id="booking-success-title">
+              {confirmedBooking.paymentStatus === "Paid" ? "Payment successful." : "Booking successful."}
+            </h2>
+            <p>
+              Your {confirmedBooking.serviceName} booking is saved for {confirmedBooking.date} at {confirmedBooking.time}.
+            </p>
+            <div className="booking-success-details">
+              <span>
+                <small>Booking ID</small>
+                <strong>{confirmedBooking.bookingId}</strong>
+              </span>
+              <span>
+                <small>Amount</small>
+                <strong>₹{confirmedBooking.amount}</strong>
+              </span>
+              {Number(confirmedBooking.discountAmount) > 0 && (
+                <span>
+                  <small>Coupon</small>
+                  <strong>{confirmedBooking.couponCode} saved ₹{confirmedBooking.discountAmount}</strong>
+                </span>
+              )}
+              <span>
+                <small>Payment</small>
+                <strong>{confirmedBooking.paymentMethod} · {confirmedBooking.paymentStatus}</strong>
+              </span>
+            </div>
+            <div className="success-actions">
+              <button className="btn btn-primary" type="button" onClick={openBookingHistory}>
+                Go to booking history <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    )}
   </main>;
 }
 

@@ -1,25 +1,18 @@
-import { DataTypes, Model } from "sequelize";
-import sequelize from "../config/sequelize.js";
+import { SupabaseModel } from "./SupabaseModel.js";
 
-class PaymentMethodSetting extends Model {}
-
-PaymentMethodSetting.init(
-  {
-    method: {
-      type: DataTypes.ENUM("UPI", "Debit/Credit Card", "Net Banking", "Cash on Service", "Wallet"),
-      primaryKey: true
-    },
-    enabled: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: true
-    }
-  },
-  {
-    sequelize,
-    modelName: "PaymentMethodSetting",
-    tableName: "payment_method_settings"
+class PaymentMethodSetting extends SupabaseModel {
+  static get tableName() {
+    return "payment_method_settings";
   }
-);
+
+  static get primaryKey() {
+    return "method";
+  }
+
+  /* This table uses 'method' (text) as PK, not UUID — skip _id→id mapping */
+  static get columnMap() {
+    return {};
+  }
+}
 
 export default PaymentMethodSetting;

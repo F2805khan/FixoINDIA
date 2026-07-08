@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import Booking from "../models/Booking.js";
-import { Op } from "sequelize";
+import { Op } from "./sequelizeMock.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 

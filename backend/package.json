@@ -7,19 +7,17 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "seed": "node data/seedServices.js",
-    "sync-db": "node scripts/syncDatabase.js"
+    "seed": "node data/seedServices.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.110.1",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "firebase-admin": "^13.10.0",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.15.3",
-    "resend": "^6.12.4",
-    "sequelize": "^6.37.7"
+    "resend": "^6.12.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

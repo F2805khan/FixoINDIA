@@ -39,6 +39,7 @@ import {
   Scissors,
   Sparkles,
   Star,
+  Tag,
   Upload,
   Video
 } from "lucide-react";
@@ -89,6 +90,17 @@ const blankBeautyVideo = {
   videoThumbnail: ""
 };
 
+const blankCoupon = {
+  code: "",
+  discountType: "flat",
+  discountValue: "",
+  minOrderAmount: "",
+  maxDiscount: "",
+  usageLimit: "1",
+  expiresAt: "",
+  isActive: true
+};
+
 const regions = ["All Regions", "Bengaluru", "Delhi NCR", "Mumbai", "Hyderabad", "Pune", "Chennai"];
 
 const emptyOverview = {
@@ -129,6 +141,22 @@ const formatDate = (value) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+};
+
+const formatCouponDiscount = (coupon) => {
+  if (coupon.discountType === "percentage") {
+    return `${Number(coupon.discountValue) || 0}%`;
+  }
+  return formatMoney(coupon.discountValue);
+};
+
+const formatCouponUsage = (coupon) => {
+  const used = Number(coupon.usedCount) || 0;
+  const limit = coupon.usageLimit;
+  if (limit === null || limit === undefined || limit === "") {
+    return `${used} / Unlimited`;
+  }
+  return `${used} / ${limit}`;
 };
 
 const getBookingKey = (booking) => String(booking?._id || booking?.bookingId || "");
@@ -201,6 +229,10 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
   const [overview, setOverview] = useState(emptyOverview);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(null);
+  const [coupons, setCoupons] = useState([]);
+  const [couponForm, setCouponForm] = useState(blankCoupon);
+  const [couponSaving, setCouponSaving] = useState(false);
+  const [deletingCouponId, setDeletingCouponId] = useState(null);
   
   // Custom states for complete lists
   const [bookingsList, setBookingsList] = useState([]);
@@ -337,6 +369,10 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     setPaymentMethods(await api.getAdminPaymentMethods());
   };
 
+  const loadCoupons = async () => {
+    setCoupons(await api.getAdminCoupons());
+  };
+
   const loadBookingsList = async () => {
     try {
       const data = await api.getAdminBookings();
@@ -380,6 +416,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
         loadOverview(),
         refreshServices(),
         loadPaymentMethods(),
+        loadCoupons(),
         loadBookingsList(),
         loadUsersList(),
         loadSupportList(),
@@ -571,6 +608,70 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
       toast.error(error.message);
     } finally {
       setUpdatingPaymentMethod(null);
+    }
+  };
+
+  const updateCouponForm = (event) => {
+    const { name, type, checked, value } = event.target;
+    setCouponForm((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value
+    }));
+  };
+
+  const resetCouponForm = () => setCouponForm(blankCoupon);
+
+  const getCouponId = (coupon) => coupon?._id || coupon?.id;
+
+  const submitCoupon = async (event) => {
+    event.preventDefault();
+    setCouponSaving(true);
+    try {
+      await api.createAdminCoupon({
+        ...couponForm,
+        code: couponForm.code.trim(),
+        discountValue: Number(couponForm.discountValue),
+        minOrderAmount: Number(couponForm.minOrderAmount) || 0,
+        maxDiscount: couponForm.maxDiscount === "" ? null : Number(couponForm.maxDiscount),
+        usageLimit: couponForm.usageLimit === "" ? null : Number(couponForm.usageLimit),
+        expiresAt: couponForm.expiresAt ? new Date(couponForm.expiresAt).toISOString() : null
+      });
+      resetCouponForm();
+      await loadCoupons();
+      toast.success("Coupon created.");
+    } catch (error) {
+      toast.error(error.message || "Could not save coupon.");
+    } finally {
+      setCouponSaving(false);
+    }
+  };
+
+  const toggleCoupon = async (coupon) => {
+    const couponId = getCouponId(coupon);
+    if (!couponId) return;
+    try {
+      await api.updateAdminCoupon(couponId, { isActive: coupon.isActive === false });
+      await loadCoupons();
+      toast.success(`Coupon ${coupon.isActive === false ? "enabled" : "disabled"}.`);
+    } catch (error) {
+      toast.error(error.message || "Could not update coupon.");
+    }
+  };
+
+  const deleteCoupon = async (coupon) => {
+    const couponId = getCouponId(coupon);
+    if (!couponId) return;
+    if (!window.confirm(`Delete coupon ${coupon.code}?`)) return;
+
+    setDeletingCouponId(couponId);
+    try {
+      await api.deleteAdminCoupon(couponId);
+      await loadCoupons();
+      toast.success("Coupon deleted.");
+    } catch (error) {
+      toast.error(error.message || "Could not delete coupon.");
+    } finally {
+      setDeletingCouponId(null);
     }
   };
 
@@ -939,7 +1040,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     beauty: "Add beauty artists, assign beauty services, and save artist video uploads.",
     users: "Full list of user profiles, address coordinates, and account management tools.",
     support: "Read customer support queries, view ticket IDs, and send email replies.",
-    settings: "Configure active payment gateways and options visible in customer checkout."
+    settings: "Configure payment gateways and manage discount coupons for customer checkout."
   };
 
   // Expand toggler for booking rows
@@ -1915,6 +2016,186 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
             </label>
           ))}
         </div>
+      </section>
+
+      <section className="admin-panel coupon-settings-panel">
+        <div className="section-heading inline">
+          <div>
+            <h2>Discount Coupons</h2>
+            <p>Create promo codes customers can apply during checkout. Inactive or expired coupons are rejected automatically.</p>
+          </div>
+          <Tag size={22} />
+        </div>
+
+        <form className="admin-form coupon-settings-form" onSubmit={submitCoupon}>
+          <div className="admin-form-grid">
+            <label>
+              Coupon Code
+              <input
+                name="code"
+                value={couponForm.code}
+                onChange={updateCouponForm}
+                placeholder="SAVE100"
+                required
+              />
+            </label>
+            <label>
+              Discount Type
+              <select name="discountType" value={couponForm.discountType} onChange={updateCouponForm} required>
+                <option value="flat">Flat amount (INR)</option>
+                <option value="percentage">Percentage (%)</option>
+              </select>
+            </label>
+            <label>
+              Discount Value
+              <input
+                name="discountValue"
+                type="number"
+                min="1"
+                step={couponForm.discountType === "percentage" ? "1" : "10"}
+                max={couponForm.discountType === "percentage" ? "100" : undefined}
+                value={couponForm.discountValue}
+                onChange={updateCouponForm}
+                placeholder={couponForm.discountType === "percentage" ? "10" : "100"}
+                required
+              />
+            </label>
+            <label>
+              Minimum Order
+              <input
+                name="minOrderAmount"
+                type="number"
+                min="0"
+                step="10"
+                value={couponForm.minOrderAmount}
+                onChange={updateCouponForm}
+                placeholder="0"
+              />
+            </label>
+            <label>
+              Max Discount Cap
+              <input
+                name="maxDiscount"
+                type="number"
+                min="0"
+                step="10"
+                value={couponForm.maxDiscount}
+                onChange={updateCouponForm}
+                placeholder={couponForm.discountType === "percentage" ? "500" : "Optional"}
+              />
+            </label>
+            <label>
+              Usage Limit
+              <input
+                name="usageLimit"
+                type="number"
+                min="1"
+                step="1"
+                value={couponForm.usageLimit}
+                onChange={updateCouponForm}
+                placeholder="1 (blank = unlimited)"
+              />
+            </label>
+            <label>
+              Expires On
+              <input
+                name="expiresAt"
+                type="datetime-local"
+                value={couponForm.expiresAt}
+                onChange={updateCouponForm}
+              />
+            </label>
+            <label className="admin-toggle-field">
+              Coupon status
+              <span>
+                <input name="isActive" type="checkbox" checked={couponForm.isActive} onChange={updateCouponForm} />
+                {couponForm.isActive ? "Active - customers can apply" : "Inactive - hidden at checkout"}
+              </span>
+            </label>
+          </div>
+
+          <div className="coupon-form-actions">
+            <button className="btn btn-primary" type="submit" disabled={couponSaving}>
+              <Plus size={17} /> {couponSaving ? "Saving" : "Create Coupon"}
+            </button>
+            <button className="btn btn-soft" type="button" onClick={resetCouponForm} disabled={couponSaving}>
+              Reset
+            </button>
+          </div>
+        </form>
+
+        {coupons.length ? (
+          <div className="admin-table-wrapper">
+            <table className="admin-datatable coupon-settings-table">
+              <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Discount</th>
+                  <th>Min Order</th>
+                  <th>Max Cap</th>
+                  <th>Usage</th>
+                  <th>Expires</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coupons.map((coupon) => {
+                  const couponId = getCouponId(coupon);
+                  return (
+                    <tr key={couponId || coupon.code}>
+                      <td>
+                        <strong className="coupon-code-badge">{coupon.code}</strong>
+                      </td>
+                      <td>
+                        <strong>{formatCouponDiscount(coupon)}</strong>
+                        <small className="block text-muted text-xs capitalize">{coupon.discountType}</small>
+                      </td>
+                      <td>{formatMoney(coupon.minOrderAmount)}</td>
+                      <td>{coupon.maxDiscount ? formatMoney(coupon.maxDiscount) : "—"}</td>
+                      <td>{formatCouponUsage(coupon)}</td>
+                      <td>{coupon.expiresAt ? formatDate(coupon.expiresAt) : "No expiry"}</td>
+                      <td>
+                        <span className={`status-badge ${coupon.isActive === false ? "cancelled" : "confirmed"}`}>
+                          {coupon.isActive === false ? "Inactive" : "Active"}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="coupon-row-actions">
+                          <button
+                            className={`icon-button ${coupon.isActive === false ? "" : "success"}`}
+                            type="button"
+                            onClick={() => toggleCoupon(coupon)}
+                            aria-label={`${coupon.isActive === false ? "Enable" : "Disable"} ${coupon.code}`}
+                            title={coupon.isActive === false ? "Enable coupon" : "Disable coupon"}
+                          >
+                            {coupon.isActive === false ? <ToggleLeft size={18} /> : <ToggleRight size={18} />}
+                          </button>
+                          <button
+                            className="icon-button danger"
+                            type="button"
+                            onClick={() => deleteCoupon(coupon)}
+                            disabled={deletingCouponId === couponId}
+                            aria-label={`Delete ${coupon.code}`}
+                            title="Delete coupon"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state compact">
+            <Tag size={28} />
+            <strong>No coupons yet</strong>
+            <span>Create a promo code above to offer checkout discounts.</span>
+          </div>
+        )}
       </section>
     </div>
   );

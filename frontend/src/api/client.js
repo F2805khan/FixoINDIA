@@ -11,6 +11,7 @@ const bookingPath = (id) => `/bookings/${encodeURIComponent(id)}`;
 const paymentPath = (bookingId) => `/payment/${encodeURIComponent(bookingId)}`;
 const supportMessagesPath = (userId) => `/support/messages/${encodeURIComponent(userId)}`;
 const adminBookingPath = (id) => `/admin/bookings/${encodeURIComponent(id)}`;
+const adminCouponPath = (id) => `/admin/coupons/${encodeURIComponent(id)}`;
 const adminServicePath = (id) => `/admin/services/${encodeURIComponent(id)}`;
 const adminBeautyArtistPath = (id) => `/admin/beauty-artists/${encodeURIComponent(id)}`;
 const adminSupportPath = (id) => `/admin/support/${encodeURIComponent(id)}/reply`;
@@ -142,6 +143,8 @@ export const api = {
   }),
   createBooking: (payload) =>
     request("/bookings", { method: "POST", body: JSON.stringify(payload) }),
+  applyCoupon: (payload) =>
+    request("/coupons/apply", { method: "POST", body: JSON.stringify(payload) }),
   getMyBookings: () => request("/bookings/me"),
   getUserBookings: (userId) => request(`/bookings/user/${encodeURIComponent(userId)}`),
   getBookingById: (id) => request(bookingPath(id)),
@@ -169,6 +172,12 @@ export const api = {
   getAdminPaymentMethods: () => request("/admin/payment-methods"),
   updateAdminPaymentMethods: (methods) =>
     request("/admin/payment-methods", { method: "PUT", body: JSON.stringify({ methods }) }),
+  getAdminCoupons: () => request("/admin/coupons"),
+  createAdminCoupon: (payload) =>
+    request("/admin/coupons", { method: "POST", body: JSON.stringify(payload) }),
+  updateAdminCoupon: (id, payload) =>
+    request(adminCouponPath(id), { method: "PUT", body: JSON.stringify(payload) }),
+  deleteAdminCoupon: (id) => request(adminCouponPath(id), { method: "DELETE" }),
   getAdminSupport: () => request("/admin/support"),
   replyToSupportMessage: (id, payload) =>
     request(adminSupportPath(id), { method: "PUT", body: JSON.stringify(payload) }),
