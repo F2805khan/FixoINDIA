@@ -116,6 +116,7 @@ export const api = {
     request("/auth/verify-otp", { method: "POST", body: JSON.stringify(payload) }),
   resetPassword: (payload) =>
     request("/auth/reset-password", { method: "POST", body: JSON.stringify(payload) }),
+  getAuthMethods: () => request("/auth/methods"),
   googleLogin: (payload) =>
     request("/auth/google", { method: "POST", body: JSON.stringify(payload) }),
   getServices: (query = "") => request(`/services${query}`),
@@ -180,6 +181,9 @@ export const api = {
   resetUserPassword: (id, payload) =>
     request(adminUserPasswordPath(id), { method: "PUT", body: JSON.stringify(payload) }),
   getAdminPayments: () => request("/admin/payments"),
+  getAdminAuthMethods: () => request("/admin/auth-methods"),
+  updateAdminAuthMethods: (methods) =>
+    request("/admin/auth-methods", { method: "PUT", body: JSON.stringify({ methods }) }),
   getAdminPaymentMethods: () => request("/admin/payment-methods"),
   updateAdminPaymentMethods: (methods) =>
     request("/admin/payment-methods", { method: "PUT", body: JSON.stringify({ methods }) }),

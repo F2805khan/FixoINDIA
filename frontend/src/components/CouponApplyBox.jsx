@@ -35,7 +35,7 @@ export default function CouponApplyBox({
   onLoginRequired,
   className = ""
 }) {
-  const [couponCode, setCouponCode] = useState(appliedCoupon?.code || readStoredCouponCode() || "");
+  const [couponCode, setCouponCode] = useState(appliedCoupon?.code || "");
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState("");
   const previousAmount = useRef(orderAmount);

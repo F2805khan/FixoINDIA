@@ -23,6 +23,11 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [errorPopup, setErrorPopup] = useState({ title: "", message: "" });
+  const [authMethods, setAuthMethods] = useState([]);
+
+  useEffect(() => {
+    api.getAuthMethods().then(setAuthMethods).catch(console.error);
+  }, []);
 
   useEffect(() => onSessionChanged(setCurrentUser), []);
 
@@ -70,7 +75,12 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
       setStep("otp");
       toast.success(response.message);
     } catch (error) {
+      const isSignupEnabled = authMethods.some((m) => m.signupEnabled);
       if (error.status === 404 && isEmail(identifier)) {
+        if (!isSignupEnabled) {
+          showError("Account not found and signups are currently disabled.", "Account not found");
+          return;
+        }
         try {
           const response = await api.requestOtp({ email: identifier, purpose: "signup" });
           setOtpPurpose("signup");
@@ -204,16 +214,16 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
           </button>
         </div>
       )}
-      <div className="auth-form-panel">
+        <div className="auth-form-panel">
             <div className="auth-simple-head">
               <span className="badge"><ShieldCheck size={15} /> Secure login</span>
-              <h1>{step === "otp" ? "Verify OTP" : "Login"}</h1>
+              <h1>{step === "otp" ? "Verify OTP" : (authMethods.some((m) => m.signupEnabled) ? "Login / Signup" : "Login")}</h1>
               <p>
                 {step === "otp"
                   ? `Enter the OTP sent for ${form.identifier.trim()}.`
                   : step === "identity"
-                    ? "Enter your phone number or email to receive an OTP."
-                    : "Choose how you want to continue."}
+                    ? (authMethods.some((m) => m.signupEnabled) ? "Enter your phone number or email to receive an OTP. New users will be signed up automatically." : "Enter your phone number or email to receive an OTP to login.")
+                    : "Choose how you want to login."}
               </p>
             </div>
 
@@ -222,12 +232,12 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
                 <button className="login-choice-card" type="button" onClick={handleGoogleSuccess} disabled={loading}>
                   <span className="google-logo">G</span>
                   <strong>Continue with Google</strong>
-                  <small>Fast login with Gmail account</small>
+                  <small>{authMethods.some(m => m.signupEnabled) ? "Login or sign up instantly with Gmail" : "Login securely with Gmail"}</small>
                 </button>
                 <button className="login-choice-card" type="button" onClick={() => setStep("identity")} disabled={loading}>
                   <Phone size={24} />
                   <strong>Phone / Email OTP</strong>
-                  <small>No password, only verification code</small>
+                  <small>{authMethods.some(m => m.signupEnabled) ? "Login or sign up with verification code" : "Login with verification code"}</small>
                 </button>
                 {compact && (
                   <button className="btn btn-ghost full auth-secondary-action" type="button" onClick={onDismiss} disabled={loading}>
@@ -363,7 +373,7 @@ function AuthVisual() {
       </div>
       <div className="auth-visual-copy">
         <span>Simple access</span>
-        <strong>Login with OTP or Gmail. No password signup.</strong>
+        <strong>Login with OTP or Gmail. No passwords required.</strong>
       </div>
       <div className="auth-floating-chip chip-one">
         <ShieldCheck size={15} /> Verified booking

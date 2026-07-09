@@ -855,9 +855,55 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
 
   const isServiceDisabled = activeService.enabled === false;
 
-  return <main className="booking-page shell simple-booking-page">
+  if (confirmedBooking) {
+    return (
+      <main className="booking-page shell simple-booking-page">
+        <div className="breadcrumb"><Link to="/">Home</Link><ChevronRight size={13} /><Link to="/services">Services</Link><ChevronRight size={13} /><span>Success</span></div>
+        <div className="success-panel booking-success-panel" style={{ maxWidth: "600px", margin: "40px auto" }}>
+          <CheckCircle2 size={58} />
+          <span className="eyebrow">Booking confirmed</span>
+          <h2 id="booking-success-title">
+            {confirmedBooking.paymentStatus === "Paid" ? "Payment successful." : "Booking successful."}
+          </h2>
+          <p>
+            Your {confirmedBooking.serviceName} booking is saved for {confirmedBooking.date} at {confirmedBooking.time}.
+          </p>
+          <div className="booking-success-details">
+            <span>
+              <small>Booking ID</small>
+              <strong>{confirmedBooking.bookingId}</strong>
+            </span>
+            <span>
+              <small>Amount</small>
+              <strong>₹{confirmedBooking.amount}</strong>
+            </span>
+            {Number(confirmedBooking.discountAmount) > 0 && (
+              <span>
+                <small>Coupon</small>
+                <strong>{confirmedBooking.couponCode} saved ₹{confirmedBooking.discountAmount}</strong>
+              </span>
+            )}
+            <span>
+              <small>Payment</small>
+              <strong>{confirmedBooking.paymentMethod} · {confirmedBooking.paymentStatus}</strong>
+            </span>
+          </div>
+          <div className="success-actions">
+            <button className="btn btn-primary" type="button" onClick={openBookingHistory}>
+              Go to booking history <ArrowRight size={16} />
+            </button>
+            <Link className="btn btn-ghost" to="/">
+              Return Home
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  return <main className="booking-page shell simple-booking-page" style={{ maxWidth: "800px", margin: "0 auto" }}>
     <div className="breadcrumb"><Link to="/">Home</Link><ChevronRight size={13} /><Link to="/services">Services</Link><ChevronRight size={13} /><span>Book</span></div>
-    <div className="booking-layout simple-booking-layout"><aside className="booking-summary simple-booking-sidebar"><span className="eyebrow">Booking steps</span><h2>{activeService.title}</h2><p>{activeService.description}</p><div className="simple-step-list">{[["Slot", CalendarDays, step >= 1], ["Address", Home, step >= 2], ["Payment", CreditCard, step >= 3]].map(([label, StepIcon, active]) => <button className={active ? "active" : ""} type="button" key={label}><StepIcon size={16} /><span>{label}</span></button>)}</div>{activeService.salonName && <div className="summary-line"><span>Salon partner</span><strong>{activeService.salonName}</strong></div>}<div className="summary-line"><span>Selected slot</span><strong>{selectedDayLabel}, {selectedTime}</strong></div><div className="summary-line"><span>Quantity</span><strong>{quantity}</strong></div></aside>
+    <div className="booking-layout simple-booking-layout" style={{ gridTemplateColumns: "1fr" }}>
       <section className="booking-panel">
       {isServiceDisabled ? (
         <div className="booking-form" style={{ display: "grid", placeItems: "center", textAlign: "center", padding: "40px 20px" }}>
@@ -901,77 +947,16 @@ function BookingPage({ cartItems = [], onUpdateCartQuantity }) {
                 );
               })}
             </div>
-            {!paymentMethods.length && <p className="payment-empty">No payment method is available right now. Please contact support.</p>}<div className="review-box"><span>{selectedDayLabel} at {selectedTime} · Qty {quantity}{appliedCoupon ? ` · Coupon ${appliedCoupon.code}` : ""}</span><strong>{appliedCoupon ? <><small>₹{bookingSubtotal}</small> ₹{bookingTotal}</> : `₹${bookingTotal}`}</strong></div><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button><button className="btn btn-primary" onClick={confirmBooking} disabled={processing || !paymentMethods.length}>{processing ? "Checking payment status..." : paymentMethods.find(({ method }) => method === paymentMethod)?.type === "cash" ? "Confirm cash booking" : "Pay and confirm"} {!processing && <ArrowRight size={16} />}</button></div></div>}
+            {!paymentMethods.length && <p className="payment-empty">No payment method is available right now. Please contact support.</p>}
+            <div style={{ marginTop: "20px", marginBottom: "10px" }}>
+              <CouponApplyBox orderAmount={bookingSubtotal} user={user} appliedCoupon={appliedCoupon} onApplied={setAppliedCoupon} onRemoved={() => setAppliedCoupon(null)} onLoginRequired={() => { toast.error("Sign in before applying a coupon."); navigate("/auth"); }} className="booking-sidebar-coupon" />
+              {appliedCoupon && <div className="simple-savings coupon-saving-line" style={{ marginTop: "10px" }}><CheckCircle2 size={14} /> Coupon saved ₹{bookingDiscount}</div>}
+            </div>
+            <div className="review-box"><span>{selectedDayLabel} at {selectedTime} · Qty {quantity}{appliedCoupon ? ` · Coupon ${appliedCoupon.code}` : ""}</span><strong>{appliedCoupon ? <><small>₹{bookingSubtotal}</small> ₹{bookingTotal}</> : `₹${bookingTotal}`}</strong></div><div className="form-actions"><button className="btn btn-ghost" onClick={() => setStep(2)}>Back</button><button className="btn btn-primary" onClick={confirmBooking} disabled={processing || !paymentMethods.length}>{processing ? "Checking payment status..." : paymentMethods.find(({ method }) => method === paymentMethod)?.type === "cash" ? "Confirm cash booking" : "Pay and confirm"} {!processing && <ArrowRight size={16} />}</button></div></div>}
         </>
       )}
       </section>
-      <aside className="simple-cart-column">
-        <article className="simple-promise-card"><div><h3>Fun Promise</h3><p><Check size={15} /> Verified professionals</p><p><Check size={15} /> Hassle-free booking</p><p><Check size={15} /> Transparent pricing</p></div><span className="quality-stamp">Quality<br />Assured</span></article>
-        <article className="simple-cart-card"><h3>Cart</h3><div className="simple-cart-line"><span>{activeService.title}</span><strong>₹{unitPrice}</strong></div><small>{selectedPaymentType === "cash" ? "Cash on service" : "Online payment"} · {selectedDayLabel}, {selectedTime}</small><div className="cart-quantity-row"><span>Quantity</span><div className="quantity-control compact"><button type="button" onClick={() => updateQuantity(quantity - 1)} disabled={quantity <= 1}>-</button><b>{quantity}</b><button type="button" onClick={() => updateQuantity(quantity + 1)} disabled={quantity >= 10}>+</button></div></div><CouponApplyBox orderAmount={bookingSubtotal} user={user} appliedCoupon={appliedCoupon} onApplied={setAppliedCoupon} onRemoved={() => setAppliedCoupon(null)} onLoginRequired={() => { toast.error("Sign in before applying a coupon."); navigate("/auth"); }} className="booking-sidebar-coupon" /><div className="simple-savings"><BadgeCheck size={14} /> Platform protection included</div>{appliedCoupon && <div className="simple-savings coupon-saving-line"><CheckCircle2 size={14} /> Coupon saved ₹{bookingDiscount}</div>}<div className="simple-cart-total"><span>Amount to pay</span><strong>{appliedCoupon ? <><small>₹{bookingSubtotal}</small> ₹{bookingTotal}</> : `₹${bookingTotal}`}</strong></div><button className="btn btn-primary" type="button" onClick={() => step < 2 ? setStep(2) : step < 3 ? openPayment() : confirmBooking()} disabled={processing || isServiceDisabled || (step === 3 && !paymentMethods.length)}>{isServiceDisabled ? "Coming Soon" : step < 3 ? "Continue" : processing ? "Checking..." : "Confirm booking"}</button></article>
-      </aside>
     </div>
-    {confirmedBooking && (
-      <div
-        className="booking-confirmation-backdrop"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="booking-success-title"
-        onClick={(event) => {
-          if (event.target === event.currentTarget) {
-            closeBookingConfirmation(event);
-          }
-        }}
-      >
-        <section className="booking-confirmation-popup" onClick={(event) => event.stopPropagation()}>
-          <button
-            className="icon-button booking-confirmation-close"
-            type="button"
-            onClick={closeBookingConfirmation}
-            aria-label="Close booking confirmation"
-          >
-            <X size={18} />
-          </button>
-          <div className="success-panel booking-success-panel">
-            <CheckCircle2 size={58} />
-            <span className="eyebrow">Booking confirmed</span>
-            <h2 id="booking-success-title">
-              {confirmedBooking.paymentStatus === "Paid" ? "Payment successful." : "Booking successful."}
-            </h2>
-            <p>
-              Your {confirmedBooking.serviceName} booking is saved for {confirmedBooking.date} at {confirmedBooking.time}.
-            </p>
-            <div className="booking-success-details">
-              <span>
-                <small>Booking ID</small>
-                <strong>{confirmedBooking.bookingId}</strong>
-              </span>
-              <span>
-                <small>Amount</small>
-                <strong>₹{confirmedBooking.amount}</strong>
-              </span>
-              {Number(confirmedBooking.discountAmount) > 0 && (
-                <span>
-                  <small>Coupon</small>
-                  <strong>{confirmedBooking.couponCode} saved ₹{confirmedBooking.discountAmount}</strong>
-                </span>
-              )}
-              <span>
-                <small>Payment</small>
-                <strong>{confirmedBooking.paymentMethod} · {confirmedBooking.paymentStatus}</strong>
-              </span>
-            </div>
-            <div className="success-actions">
-              <button className="btn btn-soft" type="button" onClick={closeBookingConfirmation}>
-                Close
-              </button>
-              <button className="btn btn-primary" type="button" onClick={openBookingHistory}>
-                Go to booking history <ArrowRight size={16} />
-              </button>
-            </div>
-          </div>
-        </section>
-      </div>
-    )}
   </main>;
 }
 
@@ -1099,14 +1084,17 @@ function LegalPage({ title, type }) {
 }
 
 function Footer() {
-  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Your home. Handled. Trusted care for homes that have enough going on.</p></div><div><h4>Services</h4><Link to="/services">Home cleaning</Link><Link to="/services">Maintenance</Link><Link to="/beauty">Beauty at home</Link></div><div><h4>Company</h4><Link to="/vision">AI Vision</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy policy</Link><Link to="/terms">Terms of service</Link><Link to="/cookies">Cookie policy</Link></div><div><h4>Connect</h4><a href="#"><Instagram size={15} /> Instagram</a><a href="tel:8962635796"><Phone size={15} /> 8962635796</a><span className="footer-note">Made for urban India</span></div></div><div className="shell footer-bottom"><span>© 2026 FunService. All rights reserved.</span><span>Securely booked. Thoughtfully delivered.</span></div></footer>;
+  const currentYear = new Date().getFullYear();
+  return <footer className="site-footer"><div className="shell footer-grid"><div><Logo /><p>Your home. Handled. Trusted care for homes that have enough going on.</p></div><div><h4>Services</h4><Link to="/services">Home cleaning</Link><Link to="/services">Maintenance</Link><Link to="/beauty">Beauty at home</Link></div><div><h4>Company</h4><Link to="/vision">AI Vision</Link><Link to="/contact">Contact</Link><Link to="/privacy">Privacy policy</Link><Link to="/terms">Terms of service</Link><Link to="/cookies">Cookie policy</Link></div><div><h4>Connect</h4><a href="#"><Instagram size={15} /> Instagram</a><a href="tel:8962635796"><Phone size={15} /> 8962635796</a><span className="footer-note">Made for urban India</span></div></div><div className="shell footer-bottom"><span>© {currentYear} fixOindia. All Rights Reserved. Licensed under fixOindia Terms of Service.</span><span>Securely booked. Thoughtfully delivered.</span></div></footer>;
 }
 
 function CookieBanner() {
   const [visible, setVisible] = useState(false);
   useEffect(() => setVisible(!localStorage.getItem("funservice-cookie-consent")), []);
   if (!visible) return null;
-  return <aside className="cookie-banner"><div><strong>A small note about cookies.</strong><p>We use essential cookies and optional analytics to make fixOindia work beautifully.</p></div><div><Link to="/cookies">Learn more</Link><button className="btn btn-primary btn-small" onClick={() => { localStorage.setItem("funservice-cookie-consent", new Date().toISOString()); setVisible(false); }}>Accept</button></div></aside>;
+  const acceptCookies = () => { localStorage.setItem("funservice-cookie-consent", JSON.stringify({ accepted: true, timestamp: new Date().toISOString() })); setVisible(false); };
+  const declineCookies = () => { localStorage.setItem("funservice-cookie-consent", JSON.stringify({ accepted: false, timestamp: new Date().toISOString() })); setVisible(false); };
+  return <aside className="cookie-banner"><div><strong>🍪 We use cookies to improve your experience.</strong><p>fixOindia uses essential cookies for site functionality and optional analytics cookies to help us improve. By clicking "Accept All", you consent to our use of cookies. <Link to="/cookies">Read our Cookie Policy</Link></p></div><div><button className="btn btn-ghost btn-small" onClick={declineCookies}>Decline</button><button className="btn btn-primary btn-small" onClick={acceptCookies}>Accept All</button></div></aside>;
 }
 
 function AiGeneratorPage() {
@@ -1153,20 +1141,10 @@ function App() {
   );
   const [cartItems, setCartItems] = useState(readCartItems);
   const [sessionUser, setSessionUser] = useState(null);
-  const [loginPopupOpen, setLoginPopupOpen] = useState(false);
   const ownerRoute = location.pathname === "/owner" || location.pathname === "/backend";
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const authRoute = location.pathname === "/auth" || location.pathname === "/login";
 
   useEffect(() => onSessionChanged(setSessionUser), []);
-
-  useEffect(() => {
-    if (sessionUser || ownerRoute || authRoute) {
-      setLoginPopupOpen(false);
-      return;
-    }
-    setLoginPopupOpen(true);
-  }, [sessionUser, ownerRoute, authRoute, location.pathname]);
 
   const updateCart = (updater) => {
     setCartItems((current) => saveCartItems(updater(current)));
@@ -1240,16 +1218,6 @@ function App() {
       </div>
       {!ownerRoute && <Footer />}
       {!ownerRoute && <CookieBanner />}
-      {loginPopupOpen && !sessionUser && !ownerRoute && !authRoute && (
-        <LoginSignup
-          compact
-          onDismiss={() => setLoginPopupOpen(false)}
-          onAuthenticated={() => {
-            setLoginPopupOpen(false);
-            navigate("/");
-          }}
-        />
-      )}
     </>
   );
 }

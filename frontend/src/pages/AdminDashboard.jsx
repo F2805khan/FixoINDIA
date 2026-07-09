@@ -229,6 +229,8 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
   const [overview, setOverview] = useState(emptyOverview);
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [updatingPaymentMethod, setUpdatingPaymentMethod] = useState(null);
+  const [authMethods, setAuthMethods] = useState([]);
+  const [updatingAuthMethod, setUpdatingAuthMethod] = useState(null);
   const [coupons, setCoupons] = useState([]);
   const [couponForm, setCouponForm] = useState(blankCoupon);
   const [couponSaving, setCouponSaving] = useState(false);
@@ -369,6 +371,10 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
     setPaymentMethods(await api.getAdminPaymentMethods());
   };
 
+  const loadAuthMethods = async () => {
+    setAuthMethods(await api.getAdminAuthMethods());
+  };
+
   const loadCoupons = async () => {
     setCoupons(await api.getAdminCoupons());
   };
@@ -416,6 +422,7 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
         loadOverview(),
         refreshServices(),
         loadPaymentMethods(),
+        loadAuthMethods(),
         loadCoupons(),
         loadBookingsList(),
         loadUsersList(),
@@ -608,6 +615,21 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
       toast.error(error.message);
     } finally {
       setUpdatingPaymentMethod(null);
+    }
+  };
+
+  const toggleAuthMethodSignup = async (authMethod) => {
+    setUpdatingAuthMethod(authMethod.method);
+    try {
+      const methods = await api.updateAdminAuthMethods([
+        { method: authMethod.method, signupEnabled: !authMethod.signupEnabled }
+      ]);
+      setAuthMethods(methods);
+      toast.success(`${authMethod.method} signup ${authMethod.signupEnabled ? "disabled" : "enabled"}.`);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setUpdatingAuthMethod(null);
     }
   };
 
@@ -1993,6 +2015,35 @@ function AdminDashboard({ currentUser, services, onServiceAdded, onServiceUpdate
   const renderSettings = () => (
     <div className="admin-settings-tab animated-fade-in">
       <section className="admin-panel payment-settings-panel">
+        <div className="section-heading inline">
+          <div>
+            <h2>Authentication Methods</h2>
+            <p>Control which login/signup methods are available to customers.</p>
+          </div>
+          <UserRound size={22} />
+        </div>
+        <div className="payment-settings-grid">
+          {authMethods.map((authMethod) => (
+            <label className={`payment-setting ${authMethod.signupEnabled ? "enabled" : ""}`} key={authMethod.method}>
+              <div>
+                <strong>{authMethod.method}</strong>
+                <span>{authMethod.description}</span>
+              </div>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+                <span style={{ fontSize: "11px", color: "var(--muted)" }}>Sign Up</span>
+                <input
+                  type="checkbox"
+                  checked={authMethod.signupEnabled}
+                  disabled={updatingAuthMethod === authMethod.method}
+                  onChange={() => toggleAuthMethodSignup(authMethod)}
+                />
+              </div>
+            </label>
+          ))}
+        </div>
+      </section>
+
+      <section className="admin-panel payment-settings-panel" style={{ marginTop: "24px" }}>
         <div className="section-heading inline">
           <div>
             <h2>Payment Gateways</h2>

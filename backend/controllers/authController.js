@@ -582,3 +582,8 @@ export const googleLogin = asyncHandler(async (req, res) => {
     token: createToken(user._id)
   });
 });
+
+export const getAuthMethods = asyncHandler(async (req, res) => {
+  const methods = await getAuthMethodSettings();
+  res.json(methods);
+});

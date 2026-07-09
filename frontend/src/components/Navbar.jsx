@@ -50,7 +50,7 @@ function Navbar({ user, onLogout }) {
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
 
-        <div className={`nav-links ${open ? "open" : ""}`}>
+        <div className={`nav-links ${open ? "is-open" : ""}`}>
           {baseLinks.map(({ to, label, icon: Icon }) => (
             <NavLink key={to} to={to} onClick={closeMenus}>
               <Icon size={16} />
