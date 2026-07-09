@@ -431,7 +431,39 @@ DO $$ BEGIN
 END $$;
 
 -- ============================================================
--- Done! All 9 tables are ready.
+-- 10. AUTH_METHOD_SETTINGS table (per-method signup/login switches)
+-- ============================================================
+-- NOTE: Uses 'method' (text) as PK, not UUID.
+CREATE TABLE IF NOT EXISTS auth_method_settings (
+  method          text PRIMARY KEY,
+  signup_enabled  boolean DEFAULT true,
+  login_enabled   boolean DEFAULT true,
+  created_at      timestamptz DEFAULT now(),
+  updated_at      timestamptz DEFAULT now()
+);
+
+DO $$ BEGIN
+  ALTER TABLE auth_method_settings ADD COLUMN IF NOT EXISTS signup_enabled boolean DEFAULT true;
+  ALTER TABLE auth_method_settings ADD COLUMN IF NOT EXISTS login_enabled boolean DEFAULT true;
+  ALTER TABLE auth_method_settings ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+  ALTER TABLE auth_method_settings ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+END $$;
+
+DROP TRIGGER IF EXISTS auth_method_settings_updated_at ON auth_method_settings;
+CREATE TRIGGER auth_method_settings_updated_at
+  BEFORE UPDATE ON auth_method_settings
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Seed the three auth methods (all enabled by default). The backend will
+-- also auto-create these rows on first use, this is just for convenience.
+INSERT INTO auth_method_settings (method, signup_enabled, login_enabled) VALUES
+  ('Password', true, true),
+  ('OTP', true, true),
+  ('Google', true, true)
+ON CONFLICT (method) DO NOTHING;
+
+-- ============================================================
+-- Done! All 10 tables are ready.
 -- ============================================================
 -- Next: restart the backend server. The admin bootstrap will
 -- create/update the owner account automatically.

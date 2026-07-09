@@ -7,6 +7,7 @@ import buildIdentityWhere from "../utils/buildIdentityWhere.js";
 import { sendLoginEmail, sendOtpEmail, sendSignupEmail } from "../utils/email.js";
 import { verifyFirebaseIdToken } from "../utils/firebaseAdmin.js";
 import recordAuthEvent from "../utils/recordAuthEvent.js";
+import { assertAuthMethodEnabled } from "../utils/authMethods.js";
 
 const otpStore = globalThis.quickfixOtpStore || new Map();
 globalThis.quickfixOtpStore = otpStore;
@@ -57,6 +58,8 @@ const publicUser = (user) => ({
 });
 
 export const registerUser = asyncHandler(async (req, res) => {
+  await assertAuthMethodEnabled("password", "signup");
+
   const { name, email, phone, userId, password, address, city, latitude, longitude } = req.body;
   const normalizedUserId = userId?.trim() ? userId.trim().toLowerCase() : undefined;
 
@@ -104,6 +107,8 @@ export const registerUser = asyncHandler(async (req, res) => {
 });
 
 export const loginUser = asyncHandler(async (req, res) => {
+  await assertAuthMethodEnabled("password", "login");
+
   const { email, phone, userId, identifier, password } = req.body;
   const loginIdentifier = identifier || email || phone || userId;
 
@@ -285,6 +290,10 @@ export const requestOtp = asyncHandler(async (req, res) => {
     throw new Error("An email address is required to send OTP");
   }
 
+  if (purpose === "signup" || purpose === "login") {
+    await assertAuthMethodEnabled("otp", purpose);
+  }
+
   if (purpose === "signup" && user) {
     res.status(409);
     throw new Error("An account already exists. Please log in instead.");
@@ -410,6 +419,8 @@ export const verifyOtp = asyncHandler(async (req, res) => {
     throw new Error("Email and OTP are required");
   }
 
+  await assertAuthMethodEnabled("otp", purpose);
+
   if (purpose === "signup" && existingUser) {
     res.status(409);
     throw new Error("An account already exists. Please log in instead.");
@@ -527,6 +538,8 @@ export const googleLogin = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Account not found. Choose Signup and continue with Gmail first.");
   }
+
+  await assertAuthMethodEnabled("google", isSignup ? "signup" : "login");
 
   if (!user) {
     user = await User.create({

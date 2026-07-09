@@ -7,6 +7,7 @@ import SupportMessage from "../models/SupportMessage.js";
 import User from "../models/User.js";
 import { sendSupportReplyEmail } from "../utils/email.js";
 import { getPaymentMethodSettings, updatePaymentMethodSettings } from "../utils/paymentMethods.js";
+import { getAuthMethodSettings, updateAuthMethodSettings } from "../utils/authMethods.js";
 import { updateAcceptedBookingsCSV } from "../utils/excelExporter.js";
 import fs from "fs/promises";
 import path from "path";
@@ -217,6 +218,20 @@ export const updatePaymentMethods = asyncHandler(async (req, res) => {
 
   const methods = await updatePaymentMethodSettings(req.body.methods);
 
+  res.json(methods);
+});
+
+export const getAuthMethods = asyncHandler(async (req, res) => {
+  res.json(await getAuthMethodSettings());
+});
+
+export const updateAuthMethods = asyncHandler(async (req, res) => {
+  if (!Array.isArray(req.body.methods) || !req.body.methods.length) {
+    res.status(400);
+    throw new Error("At least one auth method setting is required");
+  }
+
+  const methods = await updateAuthMethodSettings(req.body.methods);
   res.json(methods);
 });
 
