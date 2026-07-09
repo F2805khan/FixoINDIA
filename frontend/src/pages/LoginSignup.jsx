@@ -136,9 +136,10 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
       provider.setCustomParameters({ prompt: "select_account" });
       const userCredential = await signInWithPopup(auth, provider);
       const firebaseUser = userCredential.user;
+      const isSignupEnabled = authMethods.length === 0 || authMethods.some((m) => m.signupEnabled);
       const response = await api.googleLogin({
         idToken: await firebaseUser.getIdToken(true),
-        mode: "signup"
+        mode: isSignupEnabled ? "signup" : "login"
       });
       api.saveSession(response);
       toast.success(response.user ? "Gmail login complete." : "Logged in with Gmail.");
@@ -217,12 +218,12 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
         <div className="auth-form-panel">
             <div className="auth-simple-head">
               <span className="badge"><ShieldCheck size={15} /> Secure login</span>
-              <h1>{step === "otp" ? "Verify OTP" : (authMethods.some((m) => m.signupEnabled) ? "Login / Signup" : "Login")}</h1>
+              <h1>{step === "otp" ? "Verify OTP" : ((authMethods.length === 0 || authMethods.some((m) => m.signupEnabled)) ? "Login / Signup" : "Login")}</h1>
               <p>
                 {step === "otp"
                   ? `Enter the OTP sent for ${form.identifier.trim()}.`
                   : step === "identity"
-                    ? (authMethods.some((m) => m.signupEnabled) ? "Enter your phone number or email to receive an OTP. New users will be signed up automatically." : "Enter your phone number or email to receive an OTP to login.")
+                    ? ((authMethods.length === 0 || authMethods.some((m) => m.signupEnabled)) ? "Enter your phone number or email to receive an OTP. New users will be signed up automatically." : "Enter your phone number or email to receive an OTP to login.")
                     : "Choose how you want to login."}
               </p>
             </div>
@@ -232,12 +233,12 @@ function LoginSignup({ compact = false, onAuthenticated, onDismiss }) {
                 <button className="login-choice-card" type="button" onClick={handleGoogleSuccess} disabled={loading}>
                   <span className="google-logo">G</span>
                   <strong>Continue with Google</strong>
-                  <small>{authMethods.some(m => m.signupEnabled) ? "Login or sign up instantly with Gmail" : "Login securely with Gmail"}</small>
+                  <small>{(authMethods.length === 0 || authMethods.some(m => m.signupEnabled)) ? "Login or sign up instantly with Gmail" : "Login securely with Gmail"}</small>
                 </button>
                 <button className="login-choice-card" type="button" onClick={() => setStep("identity")} disabled={loading}>
                   <Phone size={24} />
                   <strong>Phone / Email OTP</strong>
-                  <small>{authMethods.some(m => m.signupEnabled) ? "Login or sign up with verification code" : "Login with verification code"}</small>
+                  <small>{(authMethods.length === 0 || authMethods.some(m => m.signupEnabled)) ? "Login or sign up with verification code" : "Login with verification code"}</small>
                 </button>
                 {compact && (
                   <button className="btn btn-ghost full auth-secondary-action" type="button" onClick={onDismiss} disabled={loading}>
