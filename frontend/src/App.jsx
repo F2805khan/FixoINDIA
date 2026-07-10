@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "./utils/notifications.js";
 import NotificationCenter from "./components/NotificationCenter.jsx";
@@ -223,6 +223,52 @@ const checklistGroups = [
   ["Payments", ["Stripe success flow tested", "Stripe failure flow tested", "Customer portal configured"]],
   ["Launch", ["PostHog page tracking active", "Sitemap and robots.txt ready", "Support inbox connected"]]
 ];
+
+function SplashScreen({ onFinished }) {
+  const [phase, setPhase] = useState("loading"); // "loading" | "fading" | "done"
+
+  useEffect(() => {
+    const loadTimer = setTimeout(() => setPhase("fading"), 2400);
+    const doneTimer = setTimeout(() => {
+      setPhase("done");
+      onFinished();
+    }, 3200);
+    return () => {
+      clearTimeout(loadTimer);
+      clearTimeout(doneTimer);
+    };
+  }, [onFinished]);
+
+  if (phase === "done") return null;
+
+  return (
+    <div className={`splash-screen ${phase === "fading" ? "splash-fade-out" : ""}`}>
+      <div className="splash-bg-orbs" aria-hidden="true">
+        <div className="splash-orb splash-orb-1" />
+        <div className="splash-orb splash-orb-2" />
+        <div className="splash-orb splash-orb-3" />
+      </div>
+      <div className="splash-content">
+        <div className="splash-logo-wrap">
+          <span className="splash-logo-mark">
+            <img src="/images/site/funservice-logo.svg" alt="" />
+          </span>
+          <h1 className="splash-brand-name">fixO<span>india</span></h1>
+        </div>
+        <p className="splash-tagline">Your Home, Handled.</p>
+        <div className="splash-loader">
+          <div className="splash-loader-bar" />
+        </div>
+        <div className="splash-services-row" aria-hidden="true">
+          <span><Sparkles size={16} /> Cleaning</span>
+          <span><Wrench size={16} /> Repairs</span>
+          <span><Scissors size={16} /> Beauty</span>
+          <span><ShieldCheck size={16} /> Verified</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function Logo() {
   return <Link className="brand" to="/"><span className="brand-mark"><img src="/images/site/funservice-logo.svg" alt="" /></span><span>fixOindia</span></Link>;
@@ -1141,8 +1187,17 @@ function App() {
   );
   const [cartItems, setCartItems] = useState(readCartItems);
   const [sessionUser, setSessionUser] = useState(null);
+  const [splashDone, setSplashDone] = useState(() => {
+    return sessionStorage.getItem("fixo-splash-shown") === "1";
+  });
   const ownerRoute = location.pathname === "/owner" || location.pathname === "/backend";
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const showSplash = !splashDone && location.pathname === "/";
+
+  const onSplashFinished = useCallback(() => {
+    setSplashDone(true);
+    sessionStorage.setItem("fixo-splash-shown", "1");
+  }, []);
 
   useEffect(() => onSessionChanged(setSessionUser), []);
 
@@ -1187,6 +1242,7 @@ function App() {
 
   return (
     <>
+      {showSplash && <SplashScreen onFinished={onSplashFinished} />}
       {!ownerRoute && <Navbar cartCount={cartCount} />}
       <div className="route-stage" key={location.pathname}>
         <Routes>

@@ -37,6 +37,231 @@ img, video, canvas, svg { max-width: 100%; }
 p { color: var(--secondary); line-height: 1.7; }
 .shell { width: var(--shell); margin-inline: auto; }
 .section { padding: 116px 0; }
+/* ── Splash / Loading Screen ── */
+.splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, #064e3b 0%, #059669 40%, #047857 70%, #022c22 100%);
+  overflow: hidden;
+  animation: splashEntry .6s ease both;
+}
+
+@keyframes splashEntry {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.splash-screen.splash-fade-out {
+  animation: splashExit .8s ease both;
+}
+
+@keyframes splashExit {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.06); filter: blur(6px); }
+}
+
+/* Floating background orbs */
+.splash-bg-orbs { position: absolute; inset: 0; pointer-events: none; }
+
+.splash-orb {
+  position: absolute;
+  border-radius: 50%;
+  opacity: .18;
+  filter: blur(60px);
+}
+
+.splash-orb-1 {
+  width: 340px; height: 340px;
+  top: -60px; left: -80px;
+  background: #a7f3d0;
+  animation: splashOrbFloat 4s ease-in-out infinite alternate;
+}
+
+.splash-orb-2 {
+  width: 260px; height: 260px;
+  bottom: -40px; right: -50px;
+  background: #34d399;
+  animation: splashOrbFloat 5s ease-in-out 1s infinite alternate-reverse;
+}
+
+.splash-orb-3 {
+  width: 180px; height: 180px;
+  top: 40%; right: 20%;
+  background: #6ee7b7;
+  animation: splashOrbFloat 3.5s ease-in-out .5s infinite alternate;
+}
+
+@keyframes splashOrbFloat {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(20px, -30px) scale(1.15); }
+}
+
+/* Center content */
+.splash-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  text-align: center;
+  animation: splashContentRise .7s .2s ease both;
+}
+
+@keyframes splashContentRise {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Logo wrapper */
+.splash-logo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.splash-logo-mark {
+  width: 80px;
+  height: 80px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 22px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, .2), 0 0 80px rgba(167, 243, 208, .15);
+  animation: splashLogoAppear .8s .3s ease both, splashLogoPulse 2s 1.2s ease-in-out infinite;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.splash-logo-mark img {
+  width: 48px;
+  height: 48px;
+  filter: brightness(10);
+}
+
+@keyframes splashLogoAppear {
+  from { opacity: 0; transform: scale(.5) rotate(-10deg); }
+  to { opacity: 1; transform: scale(1) rotate(0); }
+}
+
+@keyframes splashLogoPulse {
+  0%, 100% { box-shadow: 0 20px 60px rgba(0, 0, 0, .2), 0 0 80px rgba(167, 243, 208, .15); }
+  50% { box-shadow: 0 20px 60px rgba(0, 0, 0, .25), 0 0 120px rgba(167, 243, 208, .3); }
+}
+
+.splash-brand-name {
+  color: #ffffff;
+  font-family: "Plus Jakarta Sans", Arial, sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -1.5px;
+  margin: 0;
+  animation: splashNameSlide .6s .5s ease both;
+}
+
+.splash-brand-name span {
+  color: #a7f3d0;
+}
+
+@keyframes splashNameSlide {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Tagline */
+.splash-tagline {
+  color: rgba(255, 255, 255, .7);
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 400;
+  margin: 0;
+  animation: splashTaglineFade .6s .8s ease both;
+}
+
+@keyframes splashTaglineFade {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Loading bar */
+.splash-loader {
+  width: 200px;
+  height: 3px;
+  background: rgba(255, 255, 255, .15);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 8px;
+  animation: splashLoaderFade .4s 1s ease both;
+}
+
+@keyframes splashLoaderFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.splash-loader-bar {
+  width: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #a7f3d0, #34d399, #6ee7b7);
+  border-radius: 3px;
+  animation: splashLoaderFill 2.2s 1s cubic-bezier(.4, 0, .2, 1) both;
+}
+
+@keyframes splashLoaderFill {
+  0% { width: 0; }
+  20% { width: 25%; }
+  50% { width: 55%; }
+  80% { width: 85%; }
+  100% { width: 100%; }
+}
+
+/* Service tags row */
+.splash-services-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 12px;
+}
+
+.splash-services-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, .55);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.splash-services-row span:nth-child(1) { animation: splashTagPop .4s 1.2s ease both; }
+.splash-services-row span:nth-child(2) { animation: splashTagPop .4s 1.4s ease both; }
+.splash-services-row span:nth-child(3) { animation: splashTagPop .4s 1.6s ease both; }
+.splash-services-row span:nth-child(4) { animation: splashTagPop .4s 1.8s ease both; }
+
+@keyframes splashTagPop {
+  from { opacity: 0; transform: translateY(8px) scale(.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .splash-logo-mark { width: 64px; height: 64px; border-radius: 18px; }
+  .splash-logo-mark img { width: 38px; height: 38px; }
+  .splash-brand-name { font-size: 28px; }
+  .splash-tagline { font-size: 15px; }
+  .splash-loader { width: 160px; }
+  .splash-services-row { gap: 12px; flex-wrap: wrap; justify-content: center; }
+  .splash-services-row span { font-size: 9px; }
+}
 
 .site-nav { position: fixed; top: 0; left: 0; right: 0; z-index: 80; border-bottom: 1px solid var(--border); background: rgba(255,254,250,.95); backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
 body:has(.site-nav) { padding-top: 68px; }
